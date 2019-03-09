@@ -50,5 +50,28 @@ def relu(Z):
     """
     A = Z * (Z >= 0)
     activation_cache = Z
-    return Z, activation_cache
-    
+    return A, activation_cache
+
+
+def linear_activation_forward(A_prev, W, B, activation):
+    """
+    Description:
+        Implement the forward propagation for the LINEAR->ACTIVATION layer
+    Input:
+        A_prev – activations of the previous layer
+        W – the weights matrix of the current layer
+        B – the bias vector of the current layer
+        Activation – the activation function to be used (a string, either “sigmoid” or “relu”)
+    Output:
+        A – the activations of the current layer
+        cache – a joint dictionary containing both linear_cache and activation_cache
+    """
+    act = globals()[activation] # get activation function 
+    Z, linear_cache = linear_forward(A_prev, W, B)
+    A, activation_cache = act(Z)
+    cache = {
+        'linear_cache': linear_cache,
+        'activation_cache': activation_cache
+    }
+    return A, cache
+        

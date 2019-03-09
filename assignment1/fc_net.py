@@ -1,7 +1,7 @@
 from layers import *
 import numpy as np
 
-class FullyConnectedNet(object):
+class FullyConnectedNet():
     """
     A fully-connected neural network with an arbitrary number of hidden layers,
     ReLU nonlinearities, and a sigmoid as last layer. This will also implement
