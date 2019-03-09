@@ -33,8 +33,6 @@ def initialize_parameters(layer_dims):
         an array of the dimensions of each layer in the network (layer 0 is the size of the flattened input, layer L is the output sigmoid)
     output: 
         a dictionary containing the initialized W and b parameters of each layer (W1...WL, b1...bL).
-    Hint: 
-        Use the randn and zeros functions of numpy to initialize W and b, respectively
     """
     params = {}
     layer_input_dim = layer_dims[0]
