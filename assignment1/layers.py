@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def linear_forward(A, W, b):
     """
     Description: Implement the linear part of a layer's forward propagation.
@@ -32,10 +33,10 @@ def sigmoid(Z):
     """
     if Z >= 0:
         e = np.exp(-Z)
-        A = 1 / (1 + e) # prevet division by zero if Z -> +inf
+        A = 1 / (1 + e) # prevent division by zero if Z -> +inf
     else:
         e = np.exp(Z)
-        A = e / (1 + e) # prevet division by zero if Z -> -inf
+        A = e / (1 + e) # prevent division by zero if Z -> -inf
     activation_cache = Z
     return A, activation_cache
 
@@ -69,14 +70,11 @@ def linear_activation_forward(A_prev, W, B, activation):
     act = globals()[activation] # get activation function 
     Z, linear_cache = linear_forward(A_prev, W, B)
     A, activation_cache = act(Z)
-    cache = {
-        'linear_cache': linear_cache,
-        'activation_cache': activation_cache
-    }
+    cache = linear_cache, activation_cache
     return A, cache
 
 
-def Linear_backward(dZ, cache):
+def linear_backward(dZ, cache):
     """
     Description:
         Implements the linear part of the backward propagation process for a single layer
@@ -88,7 +86,17 @@ def Linear_backward(dZ, cache):
         dW - Gradient of the cost with respect to W (current layer l), same shape as W
         db - Gradient of the cost with respect to b (current layer l), same shape as b
     """
-    pass
+    # f = WA+b
+    # dA = W', dw = A', db = 1
+    A_prev, W, b = cache
+    N = A_prev.shape[0]
+    A_prev_reshaped = A_prev.reshape(N, -1)
+
+    dA_prev = dZ.dot(W.T).reshape(A_prev.shape)
+    dW = A_prev_reshaped.T.dot(dZ)
+    db = np.sum(dZ, axis=0)
+
+    return dA_prev, dW, db
 
 
 def linear_activation_backward(dA, cache, activation):
@@ -104,7 +112,10 @@ def linear_activation_backward(dA, cache, activation):
         dW – Gradient of the cost with respect to W (current layer l), same shape as W
         db – Gradient of the cost with respect to b (current layer l), same shape as b
     """
-    pass
+    linear_cache, activation_cache = cache
+    activation_backward = globals()[activation + '_backward']
+    dZ = activation_backward(dA, activation_cache)
+    return linear_backward(dZ, linear_cache)
 
 
 def relu_backward(dA, activation_cache):
@@ -117,7 +128,11 @@ def relu_backward(dA, activation_cache):
     Output:
         dZ – gradient of the cost with respect to Z
     """
-    pass
+    # dZ = 1 for Z > 0 and 0 otherwise
+    Z = activation_cache
+    d_relu = (Z > 0) * 1
+    dZ = d_relu * dA
+    return dZ
 
 
 def sigmoid_backward(dA, activation_cache):
@@ -130,4 +145,9 @@ def sigmoid_backward(dA, activation_cache):
     Output:
         dZ – gradient of the cost with respect to Z
     """
-    pass
+    # dZ = sig(Z)*(1-sig(Z))
+    Z = activation_cache
+    sig_Z = sigmoid(Z)
+    d_sig = sig_Z * (1 - sig_Z)
+    dZ = d_sig * dA
+    return dZ
