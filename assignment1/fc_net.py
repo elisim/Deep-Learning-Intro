@@ -66,16 +66,16 @@ def L_model_forward(X, parameters, use_batchnorm):
     num_layers = len([key for key in d.keys() if key.startswith('W')])
 
     layer_input = X
-    caches = []
+    caches = {}
     for layer_idx in range(num_layers - 1):
-        layer_input, cache = linear_activation_forward(layer_input, parameters['W' + str(layer_idx)], parameters['b' + str(layer_idx)], 'relu')
+        W ,b = parameters['W' + str(layer_idx)], parameters['b' + str(layer_idx)]
+        layer_input, caches['L' + str(layer_idx)] = linear_activation_forward(layer_input, W, b, 'relu')
         if use_batchnorm:
             layer_input = apply_batchnorm(layer_input)
-        caches.append(cache)
 
     # last layer
-    last_post_activation, cache = linear_activation_forward(layer_input, parameters['W' + str(num_layers - 1)], parameters['b' + str(num_layers - 1)], 'sigmoid')
-    caches.append(cache)
+    W, b = parameters['W' + str(num_layers - 1)], parameters['b' + str(num_layers - 1)]
+    last_post_activation, caches['L' + str(num_layers - 1)] = linear_activation_forward(layer_input, W, b, 'sigmoid')
 
     return last_post_activation, caches
 
@@ -94,6 +94,7 @@ def compute_cost(AL, Y):
     return -np.sum(np.log(predictions_fixed)) / Y.shape[0]
 
 def apply_batchnorm(activation):
+    #TODO: calculate the batch normalization of the given activation
     return activation
 
 
