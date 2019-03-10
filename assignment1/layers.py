@@ -74,4 +74,60 @@ def linear_activation_forward(A_prev, W, B, activation):
         'activation_cache': activation_cache
     }
     return A, cache
-        
+
+
+def Linear_backward(dZ, cache):
+    """
+    Description:
+        Implements the linear part of the backward propagation process for a single layer
+    Input:
+        dZ – the gradient of the cost with respect to the linear output of the current layer (layer l)
+        cache – tuple of values (A_prev, W, b) coming from the forward propagation in the current layer
+    Output:
+        dA_prev - Gradient of the cost with respect to the activation (of the previous layer l-1), same shape as A_prev
+        dW - Gradient of the cost with respect to W (current layer l), same shape as W
+        db - Gradient of the cost with respect to b (current layer l), same shape as b
+    """
+    pass
+
+
+def linear_activation_backward(dA, cache, activation):
+    """
+    Description:
+        Implements the backward propagation for the LINEAR->ACTIVATION layer. The function
+        first computes dZ and then applies the linear_backward function.
+    Input:
+        dA – post activation gradient of the current layer
+        cache – contains both the linear cache and the activations cache
+    Output:
+        dA_prev – Gradient of the cost with respect to the activation (of the previous layer l-1), same shape as A_prev
+        dW – Gradient of the cost with respect to W (current layer l), same shape as W
+        db – Gradient of the cost with respect to b (current layer l), same shape as b
+    """
+    pass
+
+
+def relu_backward(dA, activation_cache):
+    """
+    Description:
+        Implements backward propagation for a ReLU unit
+    Input:
+        dA – the post-activation gradient
+        activation_cache – contains Z (stored during the forward propagation)
+    Output:
+        dZ – gradient of the cost with respect to Z
+    """
+    pass
+
+
+def sigmoid_backward(dA, activation_cache):
+    """
+    Description:
+        Implements backward propagation for a sigmoid unit
+    Input:
+        dA – the post-activation gradient
+        activation_cache – contains Z (stored during the forward propagation)
+    Output:
+        dZ – gradient of the cost with respect to Z
+    """
+    pass
