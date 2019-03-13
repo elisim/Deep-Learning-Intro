@@ -60,14 +60,16 @@ class FullyConnectedNet:
         :return: a dictionary with the gradients
         """
 
-        grads = []
+        grads = {}
+        last_layer_idx = self.num_layers - 1
 
+        # dL / dA = -(Y/A) + ((1-Y)/1-A)
         last_layer_dA = -(Y/AL) + ((1-Y)/1-AL)
-        grads['dA' + str(self.num_layers - 1)] = last_layer_dA
+        grads['dA' + str(last_layer_idx)] = last_layer_dA
 
-        dA, dW, db = linear_activation_backward(last_layer_dA, caches[self.num_layers - 1], 'sigmoid')
-        grads['dW' + str(self.num_layers - 1)] = dW
-        grads['db' + str(self.num_layers - 1)] = db
+        dA, dW, db = linear_activation_backward(last_layer_dA, caches[last_layer_idx], 'sigmoid')
+        grads['dW' + str(last_layer_idx)] = dW
+        grads['db' + str(last_layer_idx)] = db
 
         for layer_idx in reversed(range(self.num_layers - 1)):
             grads['dA' + str(layer_idx)] = dA
