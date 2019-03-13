@@ -93,8 +93,8 @@ def linear_backward(dZ, cache):
     A_prev_reshaped = A_prev.reshape(N, -1)
 
     dA_prev = dZ.dot(W.T).reshape(A_prev.shape)
-    dW = A_prev_reshaped.T.dot(dZ)
-    db = np.sum(dZ, axis=0)
+    dW = A_prev_reshaped.T.dot(dZ) / N
+    db = np.sum(dZ, axis=0) / N
 
     return dA_prev, dW, db
 
