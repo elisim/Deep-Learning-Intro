@@ -64,7 +64,7 @@ def L_model_forward(X, parameters, use_batchnorm):
     """
 
     # calculate the number of layers
-    num_layers = len([key for key in d.keys() if key.startswith('W')])
+    num_layers = len([key for key in parameters.keys() if key.startswith('W')])
 
     layer_input = X
     caches = {}
@@ -89,16 +89,11 @@ def compute_cost(AL, Y):
     :param Y: the labels vector (i.e. the ground truth)
     :return: the cross-entropy cost
     """
-    predictions_fixed = AL
-    index_of_zeros = np.where(Y == 0)
-    predictions_fixed[0][index_of_zeros] = 1 - predictions_fixed[0][index_of_zeros]
 
-    return -np.sum(np.log(predictions_fixed)) / Y.shape[0]
+    return -np.sum((Y * np.log(AL)) + ((1-Y) * np.log(1-AL))) / Y.shape[0]
 
 
-def apply_batchnorm(activation):
-    #TODO: calculate the batch normalization of the given activation
-    return activation
+
 
 
 def predict(X, Y, parameters):
@@ -131,3 +126,8 @@ def softmax(x):
     e_x = np.exp(x - np.max(x))
     return e_x / e_x.sum(axis=0) # sum row-wise
 
+def apply_batchnorm(activation):
+    epsilon = 0.000001
+    miu = np.sum(activation) / activation.shape[0]
+    sigma = (np.sum(activation - miu) ** 2) / activation.shape[0]
+    return (activation - miu) / (sigma + epsilon) ** 0.5
