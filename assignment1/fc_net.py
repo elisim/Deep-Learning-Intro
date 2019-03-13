@@ -54,12 +54,30 @@ class FullyConnectedNet:
         """
         Backward propagation process for the entire network.
 
-        :param AL:
-        :param Y:
-        :param caches:
-        :return:
+        :param AL: the probabilities vector, the output of the forward propagation (L_model_forward)
+        :param Y: the true labels vector (the "ground truth" - true classifications)
+        :param caches: list of caches containing for each layer: a) the linear cache; b) the activation cache
+        :return: a dictionary with the gradients
         """
-        pass
+
+        grads = []
+
+        last_layer_dA = -(Y/AL) + ((1-Y)/1-AL)
+        grads['dA' + str(self.num_layers - 1)] = last_layer_dA
+
+        dA, dW, db = linear_activation_backward(last_layer_dA, caches[self.num_layers - 1], 'sigmoid')
+        grads['dW' + str(self.num_layers - 1)] = dW
+        grads['db' + str(self.num_layers - 1)] = db
+
+        for layer_idx in reversed(range(self.num_layers - 1)):
+            grads['dA' + str(layer_idx)] = dA
+
+            dA, dW, db = linear_activation_backward(dA , caches[layer_idx], "relu")
+            grads['dW' + str(layer_idx)] = dW
+            grads['db' + str(layer_idx)] = db
+
+        return grads
+
 
 
 
