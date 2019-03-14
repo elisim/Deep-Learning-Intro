@@ -99,6 +99,46 @@ class FullyConnectedNet:
 
         return parameters
 
+    def L_layer_model(self, X, Y, layers_dims, learning_rate, num_iterations, batch_size):
+        """
+
+        :param X: the input data, a numpy array of shape (height*width , number_of_examples)
+        :param Y: the “real” labels of the data, a vector of shape (num_of_classes, number of examples)
+        :param layers_dims: a list containing the dimensions of each layer, including the input
+        :param learning_rate: the learning rate
+        :param num_iterations: number of iterations
+        :param batch_size: the number of examples in a single training batch.
+        :return: (parameters, costs) - the parameters learnt by the system during the training (the same parameters
+                                        that were updated in the update_parameters function) and the values of the cost
+                                        function (calculated by the compute_cost function). One value is to be saved
+                                        after each 100 training iterations (e.g. 3000 iterations -> 30 values)..
+        """
+        # initialization
+        parameters = initialize_parameters(layers_dims)
+        costs = []
+
+        for i in range(num_iterations):
+            # choose the batch
+            batch_idx = np.random.choice(np.arange(X.shape[1]), size=batch_size, replace=False)
+            X_batch, Y_batch = X[:, batch_idx], Y[batch_idx]
+
+            # forward pass
+            AL, caches = self.L_model_forward(X_batch, parameters, False)
+
+            # compute the cost and document it
+            cost = compute_cost(AL, Y_batch)
+            if i % 100 == 0:
+                costs.append(cost)
+
+            # backward pass
+            grads = self.L_model_backward(AL, Y, caches)
+
+            # update parameters
+            parameters = self.update_parameters(parameters, grads, learning_rate)
+
+        return parameters, costs
+
+
 def initialize_parameters(layer_dims):
     """
     input:
