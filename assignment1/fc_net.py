@@ -1,7 +1,8 @@
 from .layers import *
 import numpy as np
 
-class FullyConnectedNet():
+
+class FullyConnectedNet:
     """
     A fully-connected neural network with an arbitrary number of hidden layers,
     ReLU nonlinearities, and a sigmoid as last layer. This will also implement
@@ -52,6 +53,7 @@ def initialize_parameters(layer_dims):
 
     return params
 
+
 def L_model_forward(X, parameters, use_batchnorm):
     """
     forward propagation for the [LINEAR->RELU]*(L-1)->LINEAR->SIGMOID computation
@@ -98,3 +100,36 @@ def compute_cost(AL, Y):
 def apply_batchnorm(activation):
     #TODO: calculate the batch normalization of the given activation
     return activation
+
+
+def predict(X, Y, parameters):
+    """
+    Description:
+        The function receives an input data and the true labels and calculates the accuracy of
+        the trained neural network on the data.
+    Input:
+        X – the input data, a numpy array of shape (height*width, number_of_examples)
+        Y – the “real” labels of the data, a vector of shape (num_of_classes, number of examples)
+        parameters – a python dictionary containing the DNN architecture’s parameters
+    Output:
+        accuracy – the accuracy measure of the neural net on the provided data (i.e. the
+        percentage of the samples for which the correct label receives over 50% of the
+        confidence score). Use the softmax function to normalize the output values.
+    """
+    # scores: Array of shape (num_classes, number_of_examples) giving classification scores,
+    # where scores[c, i] is the classification score for X[i] and class c.
+    scores = L_model_forward(X, parameters, use_batchnorm=False) # TODO: ask Gilad where use_batchnorm should come from.
+    probs = softmax(scores)
+    labels_over_50 = np.where()
+
+
+
+    # compare y and y_pred
+
+
+def softmax(x):
+    """
+    Compute softmax values for each sets of scores in x
+    """
+    e_x = np.exp(x - np.max(x))
+    return e_x / e_x.sum(axis=0) # sum row-wise
