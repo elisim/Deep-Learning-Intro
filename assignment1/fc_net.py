@@ -1,4 +1,4 @@
-from .layers import *
+from layers import *
 import numpy as np
 
 
@@ -18,8 +18,7 @@ class FullyConnectedNet:
         - layer_dims: A list of integers giving the size of each hidden layer.
         - input_dim: An integer giving the size of the input.
         - num_classes: An integer giving the number of classes to classify.
-        - dropout: Scalar between 0 and 1 giving dropout strength. If dropout=1 then
-          the network should not use dropout at all.
+        - dropout: Scalar between 0 and 1 giving dropout strength. If dropout=1 then the network should not use dropout at all.
         - normalization: a boolean defines whether or not use batch norm
         """
         self.params = initialize_parameters([input_dim] + layer_dims + [num_classes])
@@ -122,8 +121,6 @@ def predict(X, Y, parameters):
     probs = softmax(scores)
     labels_over_50 = np.where()
 
-
-
     # compare y and y_pred
 
 
@@ -133,3 +130,4 @@ def softmax(x):
     """
     e_x = np.exp(x - np.max(x))
     return e_x / e_x.sum(axis=0) # sum row-wise
+
