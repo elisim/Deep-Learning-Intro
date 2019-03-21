@@ -10,7 +10,7 @@ class FullyConnectedNet:
     """
     
     def __init__(self, layer_dims, input_dim=3*32*32, num_classes=10,
-                 dropout=1, normalization=None):
+                 dropout=1, use_batchnorm=False):
         """
         Initialize a new FullyConnectedNet.
         
@@ -21,14 +21,20 @@ class FullyConnectedNet:
         - dropout: Scalar between 0 and 1 giving dropout strength. If dropout=1 then the network should not use dropout at all.
         - normalization: a boolean defines whether or not use batch norm
         """
-        self.params = initialize_parameters([input_dim] + layer_dims + [num_classes])
-        self.normalization = normalization
+        np.random.seed(42)
+        self.params = {}
+        self.input_dim = input_dim
+        self.num_classes = num_classes
+        self.use_batchnorm = use_batchnorm
         self.use_dropout = dropout != 1
+        self.layer_dims = layer_dims
         self.num_layers = 1 + len(layer_dims)
+        self.initialize_parameters()
 
-    def L_model_forward(self, X, parameters, use_batchnorm):
+
+    def L_model_forward(self, X):
         """
-        forward propagation for the [LINEAR->RELU]*(L-1)->LINEAR->SIGMOID computation
+        forward propagation for the [LINEAR->RELU]*(L-1)->LINEAR->SOFTMAX computation
 
         :param X: the data, numpy array of shape (input size, number of examples)
         :param parameters: the initialized W and b parameters of each layer
@@ -37,16 +43,18 @@ class FullyConnectedNet:
         """
 
         layer_input = X
-        caches = {}
+        caches = []
         for layer_idx in range(self.num_layers - 1):
-            W, b = parameters['W' + str(layer_idx)], parameters['b' + str(layer_idx)]
-            layer_input, caches[layer_idx] = linear_activation_forward(layer_input, W, b, 'relu')
-            if use_batchnorm:
+            W, b = self.parameters['W' + str(layer_idx+1)], self.parameters['b' + str(layer_idx+1)]
+            layer_input, layer_cache = linear_activation_forward(layer_input, W, b, 'relu')
+            caches.append(layer_cache)
+            if self.use_batchnorm:
                 layer_input = apply_batchnorm(layer_input)
 
         # last layer
-        W, b = parameters['W' + str(self.num_layers - 1)], parameters['b' + str(self.num_layers - 1)]
-        last_post_activation, caches[self.num_layers - 1] = linear_activation_forward(layer_input, W, b, 'sigmoid')
+        W, b = self.parameters['W' + str(self.num_layers)], self.parameters['b' + str(self.num_layers)]
+        last_post_activation, layer_cache = linear_activation_forward(layer_input, W, b, 'softmax')
+        caches.append(layer_cache)
 
         return last_post_activation, caches
 
@@ -64,7 +72,8 @@ class FullyConnectedNet:
         last_layer_idx = self.num_layers - 1
 
         # dL / dA = -(Y/A) + ((1-Y)/1-A)
-        last_layer_dA = -(Y/AL) + ((1-Y)/1-AL)
+        #TODO: fix parameters for softmax_backward (what should be dA)
+        last_layer_dA = softmax_backward()
         grads['dA' + str(last_layer_idx)] = last_layer_dA
 
         dA, dW, db = linear_activation_backward(last_layer_dA, caches[last_layer_idx], 'sigmoid')
@@ -95,7 +104,7 @@ class FullyConnectedNet:
             old_b, db = parameters['b' + str(layer_idx)], grads['dW' + str(layer_idx)]
 
             parameters['W' + str(layer_idx)] = old_W - learning_rate * dW
-            parameters['b' + str(layer_idx)] = old_b - learning_rate * db
+            parameters['b' + str(layer_idx)] = learning_rate * db
 
         return parameters
 
@@ -114,7 +123,7 @@ class FullyConnectedNet:
                                         after each 100 training iterations (e.g. 3000 iterations -> 30 values)..
         """
         # initialization
-        parameters = initialize_parameters(layers_dims)
+        self.initialize_parameters()
         costs = []
 
         for i in range(num_iterations):
@@ -139,44 +148,121 @@ class FullyConnectedNet:
         return parameters, costs
 
 
-def initialize_parameters(layer_dims):
-    """
-    input:
-        an array of the dimensions of each layer in the network (layer 0 is the size of the flattened input, layer L is the output sigmoid)
-    output:
-        a dictionary containing the initialized W and b parameters of each layer (W1...WL, b1...bL).
-    """
-    params = {}
-    layer_input_dim = layer_dims[0]
-    num_classes = layer_dims[-1]
+    def initialize_parameters(self):
+        """
+        input:
+            an array of the dimensions of each layer in the network (layer 0 is the size of the flattened input, layer L is the output softmax)
+        output:
+            a dictionary containing the initialized W and b parameters of each layer (W1...WL, b1...bL).
+        """
+        layer_input_dim = self.input_dim
 
-    # input-> hidden_layer_1 -> hidden_layer_2 -> ... -> hidden_layer_last
-    for idx, dim in enumerate(layer_dims[1:-1]): # enumrate all hidden layers
-        layer_num = str(idx+1)
-        params['W' + layer_num] = np.random.randn(layer_input_dim, dim)
-        params['b' + layer_num] = np.zeros(dim)
-        layer_input_dim = dim
+        # input-> hidden_layer_1 -> hidden_layer_2 -> ... -> hidden_layer_last
+        for idx, dim in enumerate(self.layer_dims): # enumrate all hidden layers
+            layer_num = str(idx+1)
+            self.params['W' + layer_num] = np.random.randn(layer_input_dim, dim)
+            self.params['b' + layer_num] = np.zeros(dim)
+            layer_input_dim = dim
 
-    # hidden_layer_last -> output
-    num_layers = len(layer_dims) - 1
-    params['W' + str(num_layers)] = np.random.randn(layer_input_dim, num_classes)
-    params['b' + str(num_layers)] = np.zeros(num_classes)
+        # hidden_layer_last -> output
+        num_layers = len(self.layer_dims)
+        self.params['W' + str(num_layers)] = np.random.randn(layer_input_dim, self.num_classes)
+        self.params['b' + str(num_layers)] = np.zeros(self.num_classes)
 
-    return params
 
 def compute_cost(AL, Y):
     """
-    Calculate the cost value by cross-entropy
+    Implement the cost function defined by equation. The requested cost function is categorical cross-entropy loss.
 
-    :param AL: probability vector corresponding to your label predictions, shape (1, number of examples)
+    :param AL: – probability vector corresponding to your label predictions, shape (num_of_classes, number of examples)
     :param Y: the labels vector (i.e. the ground truth)
     :return: the cross-entropy cost
     """
 
-    return -np.sum((Y * np.log(AL)) + ((1-Y) * np.log(1-AL))) / Y.shape[0]
+    #TODO: check what happen when AL got invalid value for log
+    return -np.divide( np.sum((Y * np.log(AL)).sum(axis=0)), Y.shape[0])
+    #return -np.sum((Y * np.log(AL)) + ((1-Y) * np.log(1-AL))) / Y.shape[0]
 
 
+def linear_forward(A, W, b):
+    """
+    Description: Implement the linear part of a layer's forward propagation.
 
+    input:
+        A – the activations of the previous layer
+        W – the weight matrix of the current layer (of shape [size of current layer, size of previous layer])
+        B – the bias vector of the current layer (of shape [size of current layer, 1])
+
+    Output:
+        Z – the linear component of the activation function (i.e., the value before applying the non-linear function)
+        linear_cache – a dictionary containing A, W, b (stored for making the backpropagation easier to compute)
+    """
+    n_activations = A.shape[0]
+    Z = np.dot(A.reshape(n_activations, -1), W) + b
+    linear_cache = {'A': A, 'W': W, 'b': b}
+    return Z, linear_cache
+
+def linear_activation_forward(A_prev, W, B, activation):
+    """
+    Description:
+        Implement the forward propagation for the LINEAR->ACTIVATION layer
+    Input:
+        A_prev – activations of the previous layer
+        W – the weights matrix of the current layer
+        B – the bias vector of the current layer
+        Activation – the activation function to be used (a string, either “sigmoid” or “relu”)
+    Output:
+        A – the activations of the current layer
+        cache – a joint dictionary containing both linear_cache and activation_cache
+    """
+    act = globals()[activation] # get activation function
+    Z, linear_cache = linear_forward(A_prev, W, B)
+    A, activation_cache = act(Z)
+    cache = {'linear_cache': linear_cache, 'activation_cache': activation_cache}
+    return A, cache
+
+def linear_backward(dZ, cache):
+    """
+    Description:
+        Implements the linear part of the backward propagation process for a single layer
+    Input:
+        dZ – the gradient of the cost with respect to the linear output of the current layer (layer l)
+        cache – tuple of values (A_prev, W, b) coming from the forward propagation in the current layer
+    Output:
+        dA_prev - Gradient of the cost with respect to the activation (of the previous layer l-1), same shape as A_prev
+        dW - Gradient of the cost with respect to W (current layer l), same shape as W
+        db - Gradient of the cost with respect to b (current layer l), same shape as b
+    """
+    # f = WA+b
+    # dA = W', dw = A', db = 1
+    A_prev, W, b = cache
+    N = A_prev.shape[0]
+    A_prev_reshaped = A_prev.reshape(N, -1)
+
+    dA_prev = dZ.dot(W.T).reshape(A_prev.shape)
+    dW = A_prev_reshaped.T.dot(dZ) / N
+    db = np.sum(dZ, axis=0) / N
+
+    return dA_prev, dW, db
+
+
+def linear_activation_backward(dA, cache, activation):
+    """
+    Description:
+        Implements the backward propagation for the LINEAR->ACTIVATION layer. The function
+        first computes dZ and then applies the linear_backward function.
+    Input:
+        dA – post activation gradient of the current layer
+        cache – contains both the linear cache and the activations cache
+    Output:
+        dA_prev – Gradient of the cost with respect to the activation (of the previous layer l-1), same shape as A_prev
+        dW – Gradient of the cost with respect to W (current layer l), same shape as W
+        db – Gradient of the cost with respect to b (current layer l), same shape as b
+    """
+    linear_cache, activation_cache = cache
+    activation_backward = globals()[activation + '_backward']
+    dZ = activation_backward(dA, activation_cache)
+    return linear_backward(dZ, linear_cache)
 
 
 def predict(X, Y, parameters):
@@ -201,13 +287,6 @@ def predict(X, Y, parameters):
 
     # compare y and y_pred
 
-
-def softmax(x):
-    """
-    Compute softmax values for each sets of scores in x
-    """
-    e_x = np.exp(x - np.max(x))
-    return e_x / e_x.sum(axis=0) # sum row-wise
 
 def apply_batchnorm(activation):
     epsilon = 0.000001
