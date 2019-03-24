@@ -15,15 +15,16 @@ def initialize_parameters(layer_dims):
     num_classes = layer_dims[-1]
 
     # input-> hidden_layer_1 -> hidden_layer_2 -> ... -> hidden_layer_last
-    for idx, dim in enumerate(layer_dims[1:-1]): # enumrate all hidden layers
+    for idx, dim in enumerate(layer_dims[1:]): # enumrate all hidden layers
         layer_num = str(idx+1)
-        params['W' + layer_num] = np.random.randn(dim, layer_input_dim) * 0.01
+        params['W' + layer_num] = np.random.randn(layer_input_dim, dim) * 0.1
         params['b' + layer_num] = np.zeros(dim)
         layer_input_dim = dim
 
+    # TODO: is below useless with softmax?
     # hidden_layer_last -> output
-    num_layers = len(layer_dims) - 1
-    params['W' + str(num_layers)] = np.random.randn(num_classes, layer_input_dim)
+    num_layers = len(layer_dims)
+    params['W' + str(num_layers)] = np.random.randn(layer_input_dim, num_classes)
     params['b' + str(num_layers)] = np.zeros(num_classes)
 
     return params
@@ -44,7 +45,7 @@ def linear_forward(A, W, b):
     """
     n_activations = A.shape[0]
     # TODO: check it that ok that i added the W.T here
-    Z = np.dot(A.reshape(n_activations, -1), W.T) + b
+    Z = np.dot(A.reshape(n_activations, -1), W) + b
     linear_cache = {'A': A, 'W': W, 'b': b}
     return Z, linear_cache
 
@@ -107,7 +108,7 @@ def compute_cost(AL, Y):
     """
 
     #TODO: check what happen when AL got invalid value for log
-    return - np.sum((Y.T * np.log(AL))) / Y.shape[0]
+    return - np.sum((Y * np.log(AL))) / Y.shape[0]
     #return -np.sum((Y * np.log(AL)) + ((1-Y) * np.log(1-AL))) / Y.shape[0]
 
 
@@ -133,17 +134,17 @@ def L_model_backward(AL, Y, caches):
 
     # dL / dA = -(Y/A) + ((1-Y)/1-A)
     #TODO: fix parameters for softmax_backward (what should be dA)
-    last_layer_dA = softmax_backward()
-    grads['dA' + str(num_layers+1)] = last_layer_dA
+    #last_layer_dA = -((Y / AL) - ((1-Y)/(1-AL)))
+    last_layer_idx = num_layers
 
-    dA, dW, db = linear_activation_backward(last_layer_dA, caches[last_layer_idx], 'sigmoid')
+    dA, dW, db = linear_backward(AL - Y, caches[-1]['linear_cache'])
+    grads['dA' + str(last_layer_idx)] = dA
     grads['dW' + str(last_layer_idx)] = dW
     grads['db' + str(last_layer_idx)] = db
 
-    for layer_idx in reversed(range(num_layers)):
+    for layer_idx in reversed(range(1, num_layers)):
+        dA, dW, db = linear_activation_backward(dA , caches[layer_idx - 1], "relu")
         grads['dA' + str(layer_idx)] = dA
-
-        dA, dW, db = linear_activation_backward(dA , caches[layer_idx], "relu")
         grads['dW' + str(layer_idx)] = dW
         grads['db' + str(layer_idx)] = db
 
@@ -164,13 +165,13 @@ def linear_backward(dZ, cache):
     """
     # f = WA+b
     # dA = W', dw = A', db = 1
-    A_prev, W, b = cache
+    A_prev, W, b = cache['A'], cache['W'], cache['b']
     N = A_prev.shape[0]
     A_prev_reshaped = A_prev.reshape(N, -1)
 
     dA_prev = dZ.dot(W.T).reshape(A_prev.shape)
     dW = A_prev_reshaped.T.dot(dZ) / N
-    db = np.sum(dZ, axis=0) / N
+    db = np.sum(dZ, axis=0, keepdims=True) / N
 
     return dA_prev, dW, db
 
@@ -188,7 +189,7 @@ def linear_activation_backward(dA, cache, activation):
         dW – Gradient of the cost with respect to W (current layer l), same shape as W
         db – Gradient of the cost with respect to b (current layer l), same shape as b
     """
-    linear_cache, activation_cache = cache
+    linear_cache, activation_cache = cache['linear_cache'], cache['activation_cache']
     activation_backward = globals()[activation + '_backward']
     dZ = activation_backward(dA, activation_cache)
     return linear_backward(dZ, linear_cache)
@@ -207,11 +208,11 @@ def update_parameters(parameters, grads, learning_rate):
     num_layers = len([key for key in parameters.keys() if key.startswith('W')])
 
     for layer_idx in range(1, num_layers + 1):
-        old_W, dW = parameters['W' + str(layer_idx)], grads['db' + str(layer_idx)]
-        old_b, db = parameters['b' + str(layer_idx)], grads['dW' + str(layer_idx)]
+        old_W, dW = parameters['W' + str(layer_idx)], grads['dW' + str(layer_idx)]
+        old_b, db = parameters['b' + str(layer_idx)], grads['db' + str(layer_idx)]
 
         parameters['W' + str(layer_idx)] = old_W - learning_rate * dW
-        parameters['b' + str(layer_idx)] = learning_rate * db
+        parameters['b' + str(layer_idx)] = old_b - learning_rate * db
 
     return parameters
 
@@ -247,7 +248,7 @@ def L_layer_model(X, Y, layers_dims, learning_rate, num_iterations, batch_size):
             print(cost)
 
             # backward pass
-            grads = L_model_backward(AL, Y, caches)
+            grads = L_model_backward(AL, Y_batch, caches)
 
             # update parameters
             parameters = update_parameters(parameters, grads, learning_rate)
@@ -262,7 +263,7 @@ def next_batch(X, y, batchSize):
     # loop over our dataset X in mini-batches of size batchSize
     for i in np.arange(0, X.shape[1], batchSize):
         # yield a tuple of the current batched data and labels
-        yield (X[i: i+batchSize], y[i: i+batchSize])
+        yield (X[i: i+batchSize, :], y[i: i+batchSize, :])
 
 
 def predict(X, Y, parameters):

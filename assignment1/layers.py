@@ -6,7 +6,7 @@ def softmax(Z):
     """
     activiation_cache = Z
     e_Z = np.exp(Z - np.max(Z))
-    return e_Z.T / np.sum(e_Z, axis=1), activiation_cache # sum row-wise
+    return e_Z / np.sum(e_Z, axis=1, keepdims=True), activiation_cache # sum row-wise
 
 
 def softmax_backward(dA, activation_cache):
@@ -20,10 +20,11 @@ def softmax_backward(dA, activation_cache):
         dZ – gradient of the cost with respect to Z
     """
     Z = activation_cache
-    e_Z = np.exp(Z - np.max(Z))
-    #TODO: fix the formula
-    softmax_val = e_Z / e_Z.sum(axis=0)
-    dZ = dA * softmax_val * (1-softmax_val)
+    # e_Z = np.exp(Z - np.max(Z))
+    # #TODO: fix the formula
+    # softmax_val = e_Z / e_Z.sum(axis=0)
+    # dZ = dA * softmax_val * (1-softmax_val)
+    dZ = dA - 1
     return dZ
 
 
