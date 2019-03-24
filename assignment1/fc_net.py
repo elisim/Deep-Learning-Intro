@@ -15,7 +15,7 @@ def initialize_parameters(layer_dims):
     num_classes = layer_dims[-1]
 
     # input-> hidden_layer_1 -> hidden_layer_2 -> ... -> hidden_layer_last
-    for idx, dim in enumerate(layer_dims[1:]): # enumrate all hidden layers
+    for idx, dim in enumerate(layer_dims[1:]): # enumerate all hidden layers
         layer_num = str(idx+1)
         params['W' + layer_num] = np.random.randn(layer_input_dim, dim) * 0.1
         params['b' + layer_num] = np.zeros(dim)
@@ -28,45 +28,6 @@ def initialize_parameters(layer_dims):
     params['b' + str(num_layers)] = np.zeros(num_classes)
 
     return params
-
-
-def linear_forward(A, W, b):
-    """
-    Description: Implement the linear part of a layer's forward propagation.
-
-    input:
-        A – the activations of the previous layer
-        W – the weight matrix of the current layer (of shape [size of current layer, size of previous layer])
-        B – the bias vector of the current layer (of shape [size of current layer, 1])
-
-    Output:
-        Z – the linear component of the activation function (i.e., the value before applying the non-linear function)
-        linear_cache – a dictionary containing A, W, b (stored for making the backpropagation easier to compute)
-    """
-    n_activations = A.shape[0]
-    # TODO: check it that ok that i added the W.T here
-    Z = np.dot(A.reshape(n_activations, -1), W) + b
-    linear_cache = {'A': A, 'W': W, 'b': b}
-    return Z, linear_cache
-
-def linear_activation_forward(A_prev, W, B, activation):
-    """
-    Description:
-        Implement the forward propagation for the LINEAR->ACTIVATION layer
-    Input:
-        A_prev – activations of the previous layer
-        W – the weights matrix of the current layer
-        B – the bias vector of the current layer
-        Activation – the activation function to be used (a string, either “sigmoid” or “relu”)
-    Output:
-        A – the activations of the current layer
-        cache – a joint dictionary containing both linear_cache and activation_cache
-    """
-    act = globals()[activation] # get activation function
-    Z, linear_cache = linear_forward(A_prev, W, B)
-    A, activation_cache = act(Z)
-    cache = {'linear_cache': linear_cache, 'activation_cache': activation_cache}
-    return A, cache
 
 
 def L_model_forward(X, parameters, use_batchnorm):
@@ -151,50 +112,6 @@ def L_model_backward(AL, Y, caches):
     return grads
 
 
-def linear_backward(dZ, cache):
-    """
-    Description:
-        Implements the linear part of the backward propagation process for a single layer
-    Input:
-        dZ – the gradient of the cost with respect to the linear output of the current layer (layer l)
-        cache – tuple of values (A_prev, W, b) coming from the forward propagation in the current layer
-    Output:
-        dA_prev - Gradient of the cost with respect to the activation (of the previous layer l-1), same shape as A_prev
-        dW - Gradient of the cost with respect to W (current layer l), same shape as W
-        db - Gradient of the cost with respect to b (current layer l), same shape as b
-    """
-    # f = WA+b
-    # dA = W', dw = A', db = 1
-    A_prev, W, b = cache['A'], cache['W'], cache['b']
-    N = A_prev.shape[0]
-    A_prev_reshaped = A_prev.reshape(N, -1)
-
-    dA_prev = dZ.dot(W.T).reshape(A_prev.shape)
-    dW = A_prev_reshaped.T.dot(dZ) / N
-    db = np.sum(dZ, axis=0, keepdims=True) / N
-
-    return dA_prev, dW, db
-
-
-def linear_activation_backward(dA, cache, activation):
-    """
-    Description:
-        Implements the backward propagation for the LINEAR->ACTIVATION layer. The function
-        first computes dZ and then applies the linear_backward function.
-    Input:
-        dA – post activation gradient of the current layer
-        cache – contains both the linear cache and the activations cache
-    Output:
-        dA_prev – Gradient of the cost with respect to the activation (of the previous layer l-1), same shape as A_prev
-        dW – Gradient of the cost with respect to W (current layer l), same shape as W
-        db – Gradient of the cost with respect to b (current layer l), same shape as b
-    """
-    linear_cache, activation_cache = cache['linear_cache'], cache['activation_cache']
-    activation_backward = globals()[activation + '_backward']
-    dZ = activation_backward(dA, activation_cache)
-    return linear_backward(dZ, linear_cache)
-
-
 def update_parameters(parameters, grads, learning_rate):
     """
     Updates parameters using gradient descent
@@ -215,6 +132,7 @@ def update_parameters(parameters, grads, learning_rate):
         parameters['b' + str(layer_idx)] = old_b - learning_rate * db
 
     return parameters
+
 
 def L_layer_model(X, Y, layers_dims, learning_rate, num_iterations, batch_size):
     """
@@ -245,7 +163,7 @@ def L_layer_model(X, Y, layers_dims, learning_rate, num_iterations, batch_size):
 
             # compute the cost and document it
             cost = compute_cost(AL, Y_batch)
-            print(cost)
+#             print(cost)
 
             # backward pass
             grads = L_model_backward(AL, Y_batch, caches)
@@ -253,17 +171,10 @@ def L_layer_model(X, Y, layers_dims, learning_rate, num_iterations, batch_size):
             # update parameters
             parameters = update_parameters(parameters, grads, learning_rate)
 
-        if i % 1 == 0:
-            costs.append(cost)
+            if i % 100 == 0:
+                costs.append(cost)
 
     return parameters, costs
-
-
-def next_batch(X, y, batchSize):
-    # loop over our dataset X in mini-batches of size batchSize
-    for i in np.arange(0, X.shape[1], batchSize):
-        # yield a tuple of the current batched data and labels
-        yield (X[i: i+batchSize, :], y[i: i+batchSize, :])
 
 
 def predict(X, Y, parameters):
@@ -280,10 +191,15 @@ def predict(X, Y, parameters):
         percentage of the samples for which the correct label receives over 50% of the
         confidence score). Use the softmax function to normalize the output values.
     """
-    # scores: Array of shape (num_classes, number_of_examples) giving classification scores,
-    # where scores[c, i] is the classification score for X[i] and class c.
-    scores, caches = L_model_forward(X, parameters, use_batchnorm=False) # TODO: ask Gilad where use_batchnorm should come from.
+    scores, caches = L_model_forward(X, parameters, use_batchnorm=False)
     predictions = np.argmax(scores, axis=0)
     # TODO: check if none of the classes is above 50%? 0.1 for all classes for example
     return accuracy_score(Y ,predictions)
+
+
+def next_batch(X, y, batchSize):
+    # loop over our dataset X in mini-batches of size batchSize
+    for i in np.arange(0, X.shape[0], batchSize):
+        # yield a tuple of the current batched data and labels
+        yield (X[i: i+batchSize, :], y[i: i+batchSize, :])
 
