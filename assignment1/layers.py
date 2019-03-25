@@ -153,29 +153,20 @@ def apply_batchnorm(activation):
     return (activation - mu) / np.sqrt(var + epsilon)
 
 
-def dropout_forward(x, dropout_param):
+def dropout_forward(x, p):
     """
     Performs the forward pass for (inverted) dropout.
 
     :param x: Input data, of any shape
-    :param dropout_param:  A dictionary with the following keys:
-        - p: Dropout parameter. We keep each neuron output with probability p.
-        - mode: 'test' or 'train'. If the mode is train, then perform dropout;
+    :param p: Dropout parameter. We keep each neuron output with probability p.
     :return:
         - out: Array of the same shape as x.
-        - cache: tuple (dropout_param, mask). In training mode, mask is the dropout
-          mask that was used to multiply the input; in test mode, mask is None.
-    """
-    p, mode = dropout_param['p'], dropout_param['mode']
-    mask, out = None, None
-    if mode == 'train':
-        mask = (np.random.rand(*x.shape) < p) / p  # inverted dropout mask
-        out = x * mask  # drop!
-    elif mode == 'test':
-        out = x
+        - cache: dropout mask that was used to multiply the input
 
-    cache = (dropout_param, mask)
-    return out, cache
+    """
+    mask = (np.random.rand(*x.shape) < p) / p  # inverted dropout mask
+    out = x * mask  # drop!
+    return out, mask
 
 
 def dropout_backward(dout, cache):
@@ -183,14 +174,10 @@ def dropout_backward(dout, cache):
     Perform the backward pass for (inverted) dropout.
 
     :param dout: Upstream derivatives, of any shape
-    :param cache: (dropout_param, mask) from dropout_forward.
+    :param cache: mask from dropout_forward
     :return:
     """
-    dropout_param, mask = cache
-    mode = dropout_param['mode']
-
-    if mode == 'train':
-        dx = dout * mask
-    elif mode == 'test':
-        dx = dout
+    mask = cache
+    dx = dout * mask
     return dx
+

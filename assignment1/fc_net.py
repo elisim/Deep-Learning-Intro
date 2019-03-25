@@ -31,32 +31,37 @@ def initialize_parameters(layer_dims):
     return params
 
 
-def L_model_forward(X, parameters, use_batchnorm):
+def L_model_forward(X, parameters, use_batchnorm, dropout):
     """
     forward propagation for the [LINEAR->RELU]*(L-1)->LINEAR->SOFTMAX computation
 
     :param X: the data, numpy array of shape (input size, number of examples)
     :param parameters: the initialized W and b parameters of each layer
     :param use_batchnorm: a boolean flag used to determine whether to apply batchnorm after the activation
+    :param dropout: Scalar between 0 and 1 giving dropout strength.
+                    If dropout=1 then the network should not use dropout at all.
     :return: (the last post-activation value , a list of all the cache objects)
     """
-
     layer_input = X
     caches = []
+    dropout_cache = {}  # cache for dropout layer
     num_layers = len([key for key in parameters.keys() if key.startswith('W')])
+    use_dropout = dropout != 1
 
     for layer_idx in range(1, num_layers):
         W, b = parameters['W' + str(layer_idx)], parameters['b' + str(layer_idx)]
         layer_input, layer_cache = linear_activation_forward(layer_input, W, b, 'relu', use_batchnorm)
         caches.append(layer_cache)
 
+        if use_dropout:
+            layer_input, dropout_cache[layer_idx] = dropout_forward(layer_input, dropout)
 
     # last layer
     W, b = parameters['W' + str(num_layers)], parameters['b' + str(num_layers)]
     last_post_activation, layer_cache = linear_activation_forward(layer_input, W, b, 'softmax', use_batchnorm)
     caches.append(layer_cache)
 
-    return last_post_activation, caches
+    return last_post_activation, caches, dropout_cache
 
 
 def compute_cost(AL, Y):
@@ -73,7 +78,7 @@ def compute_cost(AL, Y):
     #return -np.sum((Y * np.log(AL)) + ((1-Y) * np.log(1-AL))) / Y.shape[0]
 
 
-def L_model_backward(AL, Y, caches):
+def L_model_backward(AL, Y, caches, dropout_cache):
     """
     Backward propagation process for the entire network.
 
@@ -85,18 +90,22 @@ def L_model_backward(AL, Y, caches):
 
     grads = {}
     num_layers = len(caches)
+    use_dropout = len(dropout_cache) != 0
 
     # dL / dA = -(Y/A) + ((1-Y)/1-A)
     #TODO: fix parameters for softmax_backward (what should be dA)
     #last_layer_dA = -((Y / AL) - ((1-Y)/(1-AL)))
-    last_layer_idx = num_layers
 
+    last_layer_idx = num_layers
     dA, dW, db = linear_backward(AL - Y, caches[-1]['linear_cache'])
     grads['dA' + str(last_layer_idx)] = dA
     grads['dW' + str(last_layer_idx)] = dW
     grads['db' + str(last_layer_idx)] = db
 
     for layer_idx in reversed(range(1, num_layers)):
+        if use_dropout:
+            dA = dropout_backward(dA, dropout_cache[layer_idx])
+
         dA, dW, db = linear_activation_backward(dA , caches[layer_idx - 1], "relu")
         grads['dA' + str(layer_idx)] = dA
         grads['dW' + str(layer_idx)] = dW
@@ -127,15 +136,27 @@ def update_parameters(parameters, grads, learning_rate):
     return parameters
 
 
-def L_layer_model(X, Y, x_val, y_val, layers_dims, learning_rate, num_iterations, batch_size, use_batchnorm):
+def L_layer_model(X, Y, x_val, y_val,
+                  layers_dims,
+                  learning_rate,
+                  num_iterations,
+                  batch_size,
+                  use_batchnorm,
+                  dropout=1):
     """
+    {affine - [batch/layer norm] - relu - [dropout]} x (L - 1) - affine - softmax
 
     :param X: the input data, a numpy array of shape (height*width , number_of_examples)
     :param Y: the “real” labels of the data, a vector of shape (num_of_classes, number of examples)
+    :param x_val: same as X, for validation
+    :param y_val: same as Y, for validation
     :param layers_dims: a list containing the dimensions of each layer, including the input
     :param learning_rate: the learning rate
     :param num_iterations: number of iterations
     :param batch_size: the number of examples in a single training batch.
+    :param use_batchnorm: use batchnorm or not
+    :param dropout: Scalar between 0 and 1 giving dropout strength.
+                    If dropout=1 then the network should not use dropout at all.
     :return: (parameters, costs) - the parameters learnt by the system during the training (the same parameters
                                     that were updated in the update_parameters function) and the values of the cost
                                     function (calculated by the compute_cost function). One value is to be saved
@@ -149,19 +170,15 @@ def L_layer_model(X, Y, x_val, y_val, layers_dims, learning_rate, num_iterations
     count = 0
     for i in range(num_iterations):
         for X_batch, Y_batch in next_batch(X, Y, batch_size):
-            # choose the batch
-            # batch_idx = np.random.choice(np.arange(X.shape[1]), size=batch_size, replace=False)
-            # X_batch, Y_batch = X[:, batch_idx], Y[batch_idx]
 
             # forward pass
-            AL, caches = L_model_forward(X_batch, parameters, use_batchnorm)
+            AL, caches, dropout_caches = L_model_forward(X_batch, parameters, use_batchnorm, dropout)
 
             # compute the cost and document it
             cost = compute_cost(AL, Y_batch)
-#             print(cost)
 
             # backward pass
-            grads = L_model_backward(AL, Y_batch, caches)
+            grads = L_model_backward(AL, Y_batch, caches, dropout_caches)
 
             # update parameters
             parameters = update_parameters(parameters, grads, learning_rate)
@@ -189,11 +206,11 @@ def predict(X, Y, parameters):
         percentage of the samples for which the correct label receives over 50% of the
         confidence score). Use the softmax function to normalize the output values.
     """
-    scores, caches = L_model_forward(X, parameters, use_batchnorm=False)
+    scores, _, _ = L_model_forward(X, parameters, use_batchnorm=False, dropout=1) # test time
     predictions = np.argmax(scores, axis=1)
     Y_flatten = np.argmax(Y, axis=1)
     # TODO: check if none of the classes is above 50%? 0.1 for all classes for example
-    return accuracy_score(Y_flatten ,predictions)
+    return accuracy_score(Y_flatten, predictions)
 
 
 def next_batch(X, y, batchSize):
