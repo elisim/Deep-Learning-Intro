@@ -144,6 +144,7 @@ def linear_activation_backward(dA, cache, activation):
     dZ = activation_backward(dA, activation_cache)
     return linear_backward(dZ, linear_cache)
 
+
 def apply_batchnorm(activation):
     epsilon =  1e-8
     mu = np.mean(activation, axis=0)
@@ -151,40 +152,45 @@ def apply_batchnorm(activation):
 
     return (activation - mu) / np.sqrt(var + epsilon)
 
-# def sigmoid_backward(dA, activation_cache):
-#     """
-#     Description:
-#         Implements backward propagation for a sigmoid unit
-#     Input:
-#         dA – the post-activation gradient
-#         activation_cache – contains Z (stored during the forward propagation)
-#     Output:
-#         dZ – gradient of the cost with respect to Z
-#     """
-#     # dZ = sig(Z)*(1-sig(Z))
-#     Z = activation_cache
-#     sig_Z = sigmoid(Z)
-#     d_sig = sig_Z * (1 - sig_Z)
-#     dZ = d_sig * dA
-#     return dZ
-#
 
-# def sigmoid(Z):
-#     """
-#     Numerically-stable sigmoid function
-#     sigmoid(x) = 1/(1+exp(−x)) = exp(x)/(exp(x)+1)
-#
-#     Input:
-#         Z – the linear component of the activation function
-#     Output:
-#         A – the activations of the layer
-#         activation_cache – returns Z, which will be useful for the backpropagation
-#     """
-#     if Z >= 0:
-#         e = np.exp(-Z)
-#         A = 1 / (1 + e) # prevent division by zero if Z -> +inf
-#     else:
-#         e = np.exp(Z)
-#         A = e / (1 + e) # prevent division by zero if Z -> -inf
-#     activation_cache = Z
-#     return A, activation_cache
+def dropout_forward(x, dropout_param):
+    """
+    Performs the forward pass for (inverted) dropout.
+
+    :param x: Input data, of any shape
+    :param dropout_param:  A dictionary with the following keys:
+        - p: Dropout parameter. We keep each neuron output with probability p.
+        - mode: 'test' or 'train'. If the mode is train, then perform dropout;
+    :return:
+        - out: Array of the same shape as x.
+        - cache: tuple (dropout_param, mask). In training mode, mask is the dropout
+          mask that was used to multiply the input; in test mode, mask is None.
+    """
+    p, mode = dropout_param['p'], dropout_param['mode']
+    mask, out = None, None
+    if mode == 'train':
+        mask = (np.random.rand(*x.shape) < p) / p  # inverted dropout mask
+        out = x * mask  # drop!
+    elif mode == 'test':
+        out = x
+
+    cache = (dropout_param, mask)
+    return out, cache
+
+
+def dropout_backward(dout, cache):
+    """
+    Perform the backward pass for (inverted) dropout.
+
+    :param dout: Upstream derivatives, of any shape
+    :param cache: (dropout_param, mask) from dropout_forward.
+    :return:
+    """
+    dropout_param, mask = cache
+    mode = dropout_param['mode']
+
+    if mode == 'train':
+        dx = dout * mask
+    elif mode == 'test':
+        dx = dout
+    return dx
