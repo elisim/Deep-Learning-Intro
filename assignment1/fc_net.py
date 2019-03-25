@@ -17,7 +17,8 @@ def initialize_parameters(layer_dims):
     # input-> hidden_layer_1 -> hidden_layer_2 -> ... -> hidden_layer_last
     for idx, dim in enumerate(layer_dims[1:]): # enumerate all hidden layers
         layer_num = str(idx+1)
-        params['W' + layer_num] = np.random.randn(layer_input_dim, dim) * 0.1
+        #params['W' + layer_num] = np.random.randn(layer_input_dim, dim)
+        params['W' + layer_num] = np.random.randn(layer_input_dim, dim) * np.sqrt(2/layer_input_dim)
         params['b' + layer_num] = np.zeros(dim)
         layer_input_dim = dim
 
@@ -46,14 +47,13 @@ def L_model_forward(X, parameters, use_batchnorm):
 
     for layer_idx in range(1, num_layers):
         W, b = parameters['W' + str(layer_idx)], parameters['b' + str(layer_idx)]
-        layer_input, layer_cache = linear_activation_forward(layer_input, W, b, 'relu')
+        layer_input, layer_cache = linear_activation_forward(layer_input, W, b, 'relu', use_batchnorm)
         caches.append(layer_cache)
-        if use_batchnorm:
-            layer_input = apply_batchnorm(layer_input)
+
 
     # last layer
     W, b = parameters['W' + str(num_layers)], parameters['b' + str(num_layers)]
-    last_post_activation, layer_cache = linear_activation_forward(layer_input, W, b, 'softmax')
+    last_post_activation, layer_cache = linear_activation_forward(layer_input, W, b, 'softmax', use_batchnorm)
     caches.append(layer_cache)
 
     return last_post_activation, caches
@@ -71,13 +71,6 @@ def compute_cost(AL, Y):
     #TODO: check what happen when AL got invalid value for log
     return - np.sum((Y * np.log(AL))) / Y.shape[0]
     #return -np.sum((Y * np.log(AL)) + ((1-Y) * np.log(1-AL))) / Y.shape[0]
-
-
-def apply_batchnorm(activation):
-    epsilon = 0.000001
-    miu = np.sum(activation) / activation.shape[0]
-    sigma = (np.sum(activation - miu) ** 2) / activation.shape[0]
-    return (activation - miu) / (sigma + epsilon) ** 0.5
 
 
 def L_model_backward(AL, Y, caches):
@@ -134,7 +127,7 @@ def update_parameters(parameters, grads, learning_rate):
     return parameters
 
 
-def L_layer_model(X, Y, layers_dims, learning_rate, num_iterations, batch_size):
+def L_layer_model(X, Y, x_val, y_val, layers_dims, learning_rate, num_iterations, batch_size, use_batchnorm):
     """
 
     :param X: the input data, a numpy array of shape (height*width , number_of_examples)
@@ -151,7 +144,9 @@ def L_layer_model(X, Y, layers_dims, learning_rate, num_iterations, batch_size):
     # initialization
     parameters = initialize_parameters([X.shape[1]] + layers_dims)
     costs = []
+    accs = []
 
+    count = 0
     for i in range(num_iterations):
         for X_batch, Y_batch in next_batch(X, Y, batch_size):
             # choose the batch
@@ -159,7 +154,7 @@ def L_layer_model(X, Y, layers_dims, learning_rate, num_iterations, batch_size):
             # X_batch, Y_batch = X[:, batch_idx], Y[batch_idx]
 
             # forward pass
-            AL, caches = L_model_forward(X_batch, parameters, False)
+            AL, caches = L_model_forward(X_batch, parameters, use_batchnorm)
 
             # compute the cost and document it
             cost = compute_cost(AL, Y_batch)
@@ -171,10 +166,13 @@ def L_layer_model(X, Y, layers_dims, learning_rate, num_iterations, batch_size):
             # update parameters
             parameters = update_parameters(parameters, grads, learning_rate)
 
-            if i % 100 == 0:
+            # TODO add stopping criterion.
+            if count % 100 == 0:
+                accs.append(predict(x_val, y_val, parameters))
                 costs.append(cost)
+            count += 1
 
-    return parameters, costs
+    return parameters, costs, accs
 
 
 def predict(X, Y, parameters):
@@ -192,9 +190,10 @@ def predict(X, Y, parameters):
         confidence score). Use the softmax function to normalize the output values.
     """
     scores, caches = L_model_forward(X, parameters, use_batchnorm=False)
-    predictions = np.argmax(scores, axis=0)
+    predictions = np.argmax(scores, axis=1)
+    Y_flatten = np.argmax(Y, axis=1)
     # TODO: check if none of the classes is above 50%? 0.1 for all classes for example
-    return accuracy_score(Y ,predictions)
+    return accuracy_score(Y_flatten ,predictions)
 
 
 def next_batch(X, y, batchSize):

@@ -104,7 +104,7 @@ def linear_backward(dZ, cache):
     return dA_prev, dW, db
 
 
-def linear_activation_forward(A_prev, W, B, activation):
+def linear_activation_forward(A_prev, W, B, activation, use_batchnorm):
     """
     Description:
         Implement the forward propagation for the LINEAR->ACTIVATION layer
@@ -119,6 +119,8 @@ def linear_activation_forward(A_prev, W, B, activation):
     """
     act = globals()[activation] # get activation function
     Z, linear_cache = linear_forward(A_prev, W, B)
+    if use_batchnorm:
+        Z = apply_batchnorm(Z)
     A, activation_cache = act(Z)
     cache = {'linear_cache': linear_cache, 'activation_cache': activation_cache}
     return A, cache
@@ -142,6 +144,12 @@ def linear_activation_backward(dA, cache, activation):
     dZ = activation_backward(dA, activation_cache)
     return linear_backward(dZ, linear_cache)
 
+def apply_batchnorm(activation):
+    epsilon =  1e-8
+    mu = np.mean(activation, axis=0)
+    var = np.var(activation, axis=0)
+
+    return (activation - mu) / np.sqrt(var + epsilon)
 
 # def sigmoid_backward(dA, activation_cache):
 #     """
