@@ -25,7 +25,7 @@ def initialize_parameters(layer_dims):
     # TODO: is below useless with softmax?
     # hidden_layer_last -> output
     num_layers = len(layer_dims)
-    params['W' + str(num_layers)] = np.random.randn(layer_input_dim, num_classes)
+    params['W' + str(num_layers)] = np.random.randn(layer_input_dim, num_classes) * np.sqrt(1/layer_input_dim)
     params['b' + str(num_layers)] = np.zeros(num_classes)
 
     return params
@@ -58,7 +58,7 @@ def L_model_forward(X, parameters, use_batchnorm, dropout):
 
     # last layer
     W, b = parameters['W' + str(num_layers)], parameters['b' + str(num_layers)]
-    last_post_activation, layer_cache = linear_activation_forward(layer_input, W, b, 'softmax', use_batchnorm)
+    last_post_activation, layer_cache = linear_activation_forward(layer_input, W, b, 'softmax', False)
     caches.append(layer_cache)
 
     return last_post_activation, caches, dropout_cache
