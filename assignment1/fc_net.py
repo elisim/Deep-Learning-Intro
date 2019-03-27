@@ -22,7 +22,6 @@ def initialize_parameters(layer_dims):
         params['b' + layer_num] = np.zeros(dim)
         layer_input_dim = dim
 
-    # TODO: is below useless with softmax?
     # hidden_layer_last -> output
     num_layers = len(layer_dims)
     params['W' + str(num_layers)] = np.random.randn(layer_input_dim, num_classes) * np.sqrt(1/layer_input_dim)
@@ -45,12 +44,13 @@ def L_model_forward(X, parameters, use_batchnorm, dropout):
     layer_input = X
     caches = []
     dropout_cache = {}  # cache for dropout layer
+    batchnorm_cache = {} # cache for batchnorm layer
     num_layers = len([key for key in parameters.keys() if key.startswith('W')])
     use_dropout = dropout != 1
 
     for layer_idx in range(1, num_layers):
         W, b = parameters['W' + str(layer_idx)], parameters['b' + str(layer_idx)]
-        layer_input, layer_cache = linear_activation_forward(layer_input, W, b, 'relu', use_batchnorm)
+        layer_input, layer_cache, batchnorm_cache[layer_idx] = linear_activation_forward(layer_input, W, b, 'relu', use_batchnorm)
         caches.append(layer_cache)
 
         if use_dropout:
@@ -58,10 +58,10 @@ def L_model_forward(X, parameters, use_batchnorm, dropout):
 
     # last layer
     W, b = parameters['W' + str(num_layers)], parameters['b' + str(num_layers)]
-    last_post_activation, layer_cache = linear_activation_forward(layer_input, W, b, 'softmax', False)
+    last_post_activation, layer_cache, _ = linear_activation_forward(layer_input, W, b, 'softmax', False)
     caches.append(layer_cache)
 
-    return last_post_activation, caches, dropout_cache
+    return last_post_activation, caches, batchnorm_cache, dropout_cache
 
 
 def compute_cost(AL, Y):
@@ -75,10 +75,9 @@ def compute_cost(AL, Y):
 
     #TODO: check what happen when AL got invalid value for log
     return - np.sum((Y * np.log(AL))) / Y.shape[0]
-    #return -np.sum((Y * np.log(AL)) + ((1-Y) * np.log(1-AL))) / Y.shape[0]
 
 
-def L_model_backward(AL, Y, caches, dropout_cache):
+def L_model_backward(AL, Y, caches, use_batchnorm, batchnorm_cache, dropout_cache):
     """
     Backward propagation process for the entire network.
 
@@ -92,10 +91,6 @@ def L_model_backward(AL, Y, caches, dropout_cache):
     num_layers = len(caches)
     use_dropout = len(dropout_cache) != 0
 
-    # dL / dA = -(Y/A) + ((1-Y)/1-A)
-    #TODO: fix parameters for softmax_backward (what should be dA)
-    #last_layer_dA = -((Y / AL) - ((1-Y)/(1-AL)))
-
     last_layer_idx = num_layers
     dA, dW, db = linear_backward(AL - Y, caches[-1]['linear_cache'])
     grads['dA' + str(last_layer_idx)] = dA
@@ -106,7 +101,7 @@ def L_model_backward(AL, Y, caches, dropout_cache):
         if use_dropout:
             dA = dropout_backward(dA, dropout_cache[layer_idx])
 
-        dA, dW, db = linear_activation_backward(dA , caches[layer_idx - 1], "relu")
+        dA, dW, db = linear_activation_backward(dA , caches[layer_idx - 1], "relu", use_batchnorm, batchnorm_cache[layer_idx])
         grads['dA' + str(layer_idx)] = dA
         grads['dW' + str(layer_idx)] = dW
         grads['db' + str(layer_idx)] = db
@@ -172,27 +167,27 @@ def L_layer_model(X, Y, x_val, y_val,
         for X_batch, Y_batch in next_batch(X, Y, batch_size):
 
             # forward pass
-            AL, caches, dropout_caches = L_model_forward(X_batch, parameters, use_batchnorm, dropout)
+            AL, caches, batchnorm_cache, dropout_caches = L_model_forward(X_batch, parameters, use_batchnorm, dropout)
 
             # compute the cost and document it
             cost = compute_cost(AL, Y_batch)
 
             # backward pass
-            grads = L_model_backward(AL, Y_batch, caches, dropout_caches)
+            grads = L_model_backward(AL, Y_batch, caches, use_batchnorm, batchnorm_cache, dropout_caches)
 
             # update parameters
             parameters = update_parameters(parameters, grads, learning_rate)
 
             # TODO add stopping criterion.
             if count % 100 == 0:
-                accs.append(predict(x_val, y_val, parameters))
+                accs.append(predict(x_val, y_val, parameters, use_batchnorm))
                 costs.append(cost)
             count += 1
 
     return parameters, costs, accs
 
 
-def predict(X, Y, parameters):
+def predict(X, Y, parameters, use_batchnorm):
     """
     Description:
         The function receives an input data and the true labels and calculates the accuracy of
@@ -206,7 +201,7 @@ def predict(X, Y, parameters):
         percentage of the samples for which the correct label receives over 50% of the
         confidence score). Use the softmax function to normalize the output values.
     """
-    scores, _, _ = L_model_forward(X, parameters, use_batchnorm=False, dropout=1) # test time
+    scores, _, _, _ = L_model_forward(X, parameters, use_batchnorm=use_batchnorm, dropout=1) # test time
     predictions = np.argmax(scores, axis=1)
     Y_flatten = np.argmax(Y, axis=1)
     # TODO: check if none of the classes is above 50%? 0.1 for all classes for example
