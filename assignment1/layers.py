@@ -54,7 +54,7 @@ def linear_forward(A, W, b):
         linear_cache – a dictionary containing A, W, b (stored for making the backpropagation easier to compute)
     """
     n_activations = A.shape[0]
-    Z = np.dot(A.reshape(n_activations, -1), W) + b
+    Z = np.dot(A, W) + b
     linear_cache = {'A': A, 'W': W, 'b': b}
     return Z, linear_cache
 
@@ -128,7 +128,11 @@ def linear_activation_backward(dA, cache, activation, use_batchnorm, batchnorm_c
     return linear_backward(dZ, linear_cache)
 
 def batchnorm_backward(dZ_norm, batchnorm_cache):
-    activation, activation_normed, miu, var = batchnorm_cache
+    activation = batchnorm_cache['activation']
+    activation_normed = batchnorm_cache['activation_norm']
+    miu = batchnorm_cache['miu']
+    var = batchnorm_cache['var']
+
     N = activation.shape[0]
 
     activation_centered = activation - miu

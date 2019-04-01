@@ -1,7 +1,7 @@
 from layers import *
 import numpy as np
 from sklearn.metrics import accuracy_score
-
+from sklearn.model_selection import train_test_split
 
 def initialize_parameters(layer_dims):
     """
@@ -72,8 +72,6 @@ def compute_cost(AL, Y):
     :param Y: the labels vector (i.e. the ground truth)
     :return: the cross-entropy cost
     """
-
-    #TODO: check what happen when AL got invalid value for log
     return - np.sum((Y * np.log(AL))) / Y.shape[0]
 
 
@@ -130,21 +128,19 @@ def update_parameters(parameters, grads, learning_rate):
 
     return parameters
 
-
-def L_layer_model(X, Y, x_val, y_val,
+def L_layer_model(X, Y,
                   layers_dims,
                   learning_rate,
                   num_iterations,
                   batch_size,
                   use_batchnorm,
+                  min_epochs,
                   dropout=1):
     """
     {affine - [batch/layer norm] - relu - [dropout]} x (L - 1) - affine - softmax
 
     :param X: the input data, a numpy array of shape (height*width , number_of_examples)
     :param Y: the “real” labels of the data, a vector of shape (num_of_classes, number of examples)
-    :param x_val: same as X, for validation
-    :param y_val: same as Y, for validation
     :param layers_dims: a list containing the dimensions of each layer, including the input
     :param learning_rate: the learning rate
     :param num_iterations: number of iterations
@@ -157,20 +153,31 @@ def L_layer_model(X, Y, x_val, y_val,
                                     function (calculated by the compute_cost function). One value is to be saved
                                     after each 100 training iterations (e.g. 3000 iterations -> 30 values)..
     """
+    # split to train and val
+    X_train, X_val, y_train, y_val = train_test_split(X, Y,
+                                                      test_size=0.2,
+                                                      stratify=Y, random_state=42)
+
     # initialization
     parameters = initialize_parameters([X.shape[1]] + layers_dims)
     costs = []
-    accs = []
+    accs_per_100_iterations = []
+    costs_per_100_iterations = []
 
-    count = 0
-    for i in range(num_iterations):
-        for X_batch, Y_batch in next_batch(X, Y, batch_size):
+    iterations_counter = 0
+    epoch_counter = 0
+    val_acc_no_improvement_count = 0
+    best_val_acc_value = 0
+
+    while iterations_counter < num_iterations and epoch_counter < min_epochs:
+        for X_batch, Y_batch in next_batch(X_train, y_train, batch_size):
 
             # forward pass
             AL, caches, batchnorm_cache, dropout_caches = L_model_forward(X_batch, parameters, use_batchnorm, dropout)
 
             # compute the cost and document it
             cost = compute_cost(AL, Y_batch)
+            costs.append(cost)
 
             # backward pass
             grads = L_model_backward(AL, Y_batch, caches, use_batchnorm, batchnorm_cache, dropout_caches)
@@ -178,13 +185,32 @@ def L_layer_model(X, Y, x_val, y_val,
             # update parameters
             parameters = update_parameters(parameters, grads, learning_rate)
 
-            # TODO add stopping criterion.
-            if count % 100 == 0:
-                accs.append(predict(x_val, y_val, parameters, use_batchnorm))
-                costs.append(cost)
-            count += 1
+            iterations_counter += 1
 
-    return parameters, costs, accs
+            # document performance every 100 iterations
+            val_acc = predict(X_val, y_val, parameters, use_batchnorm)
+            if iterations_counter % 100 == 0:
+                accs_per_100_iterations.append(val_acc)
+                costs_per_100_iterations.append(cost)
+                print('iteration step: {} | cost: {}'.format(iterations_counter, cost))
+
+            # check if accuracy improved
+            if val_acc > best_val_acc_value:
+                best_val_acc_value = val_acc
+                val_acc_no_improvement_count = 0
+            val_acc_no_improvement_count += 1
+
+            # check stop criteria
+            if val_acc_no_improvement_count >= 100 and epoch_counter >= min_epochs:
+                train_acc = predict(X_train, y_train, parameters, use_batchnorm)
+                val_acc = predict(X_val, y_val, parameters, use_batchnorm)
+                return parameters, costs_per_100_iterations, accs_per_100_iterations, train_acc, val_acc
+
+        epoch_counter += 1
+
+    train_acc = predict(X_train, y_train, parameters, use_batchnorm)
+    val_acc = predict(X_val, y_val, parameters, use_batchnorm)
+    return parameters, costs_per_100_iterations, accs_per_100_iterations, train_acc, val_acc
 
 
 def predict(X, Y, parameters, use_batchnorm):
@@ -204,7 +230,6 @@ def predict(X, Y, parameters, use_batchnorm):
     scores, _, _, _ = L_model_forward(X, parameters, use_batchnorm=use_batchnorm, dropout=1) # test time
     predictions = np.argmax(scores, axis=1)
     Y_flatten = np.argmax(Y, axis=1)
-    # TODO: check if none of the classes is above 50%? 0.1 for all classes for example
     return accuracy_score(Y_flatten, predictions)
 
 
