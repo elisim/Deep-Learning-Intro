@@ -10,25 +10,6 @@ def softmax(Z):
     return e_Z / np.sum(e_Z, axis=1, keepdims=True), activiation_cache # sum row-wise
 
 
-def softmax_backward(dA, activation_cache):
-    """
-    Description:
-        Implements backward propagation for a softmax unit
-    Input:
-        dA – the post-activation gradient
-        activation_cache – contains Z (stored during the forward propagation)
-    Output:
-        dZ – gradient of the cost with respect to Z
-    """
-    Z = activation_cache
-    # e_Z = np.exp(Z - np.max(Z))
-    # #TODO: fix the formula
-    # softmax_val = e_Z / e_Z.sum(axis=0)
-    # dZ = dA * softmax_val * (1-softmax_val)
-    dZ = dA - 1
-    return dZ
-
-
 def relu(Z):
     """
     Input:
@@ -73,8 +54,7 @@ def linear_forward(A, W, b):
         linear_cache – a dictionary containing A, W, b (stored for making the backpropagation easier to compute)
     """
     n_activations = A.shape[0]
-    # TODO: check it that ok that i added the W.T here
-    Z = np.dot(A.reshape(n_activations, -1), W) + b
+    Z = np.dot(A, W) + b
     linear_cache = {'A': A, 'W': W, 'b': b}
     return Z, linear_cache
 
@@ -117,16 +97,17 @@ def linear_activation_forward(A_prev, W, B, activation, use_batchnorm):
         A – the activations of the current layer
         cache – a joint dictionary containing both linear_cache and activation_cache
     """
+    batchnorm_cache = ()
     act = globals()[activation] # get activation function
     Z, linear_cache = linear_forward(A_prev, W, B)
     if use_batchnorm:
-        Z = apply_batchnorm(Z)
+        Z, batchnorm_cache = apply_batchnorm(Z)
     A, activation_cache = act(Z)
     cache = {'linear_cache': linear_cache, 'activation_cache': activation_cache}
-    return A, cache
+    return A, cache, batchnorm_cache
 
 
-def linear_activation_backward(dA, cache, activation):
+def linear_activation_backward(dA, cache, activation, use_batchnorm, batchnorm_cache):
     """
     Description:
         Implements the backward propagation for the LINEAR->ACTIVATION layer. The function
@@ -142,15 +123,35 @@ def linear_activation_backward(dA, cache, activation):
     linear_cache, activation_cache = cache['linear_cache'], cache['activation_cache']
     activation_backward = globals()[activation + '_backward']
     dZ = activation_backward(dA, activation_cache)
+    if use_batchnorm:
+        dZ = batchnorm_backward(dZ, batchnorm_cache)
     return linear_backward(dZ, linear_cache)
 
+def batchnorm_backward(dZ_norm, batchnorm_cache):
+    activation = batchnorm_cache['activation']
+    activation_normed = batchnorm_cache['activation_norm']
+    miu = batchnorm_cache['miu']
+    var = batchnorm_cache['var']
+
+    N = activation.shape[0]
+
+    activation_centered = activation - miu
+    std_inv = 1. / np.sqrt(var + 1e-8)
+
+    dvar = np.sum(dZ_norm * activation_centered, axis=0) * -0.5 * std_inv**3
+    dmiu = np.sum(dZ_norm * -std_inv, axis=0) + dvar * np.mean(-2.0 * activation_centered, axis=0)
+
+    dZ = (dZ_norm * std_inv) + (dvar * 2 * activation_centered / N) + (dmiu / N)
+    return dZ
 
 def apply_batchnorm(activation):
     epsilon =  1e-8
-    mu = np.mean(activation, axis=0)
+    miu = np.mean(activation, axis=0)
     var = np.var(activation, axis=0)
+    activation_normed = (activation - miu) / np.sqrt(var + epsilon)
+    batchnorm_cache = {'activation': activation, 'activation_norm': activation_normed, 'miu': miu,'var': var}
 
-    return (activation - mu) / np.sqrt(var + epsilon)
+    return activation_normed, batchnorm_cache
 
 
 def dropout_forward(x, p):
