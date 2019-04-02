@@ -53,7 +53,6 @@ def linear_forward(A, W, b):
         Z – the linear component of the activation function (i.e., the value before applying the non-linear function)
         linear_cache – a dictionary containing A, W, b (stored for making the backpropagation easier to compute)
     """
-    n_activations = A.shape[0]
     Z = np.dot(A, W) + b
     linear_cache = {'A': A, 'W': W, 'b': b}
     return Z, linear_cache
@@ -128,20 +127,17 @@ def linear_activation_backward(dA, cache, activation, use_batchnorm, batchnorm_c
     return linear_backward(dZ, linear_cache)
 
 def batchnorm_backward(dZ_norm, batchnorm_cache):
-    # extract backprop for batchnorm from https://deepnotes.io/batchnorm
     activation = batchnorm_cache['activation']
     miu = batchnorm_cache['miu']
     var = batchnorm_cache['var']
 
     N = activation.shape[0]
 
-    activation_centered = activation - miu
-    var_inv = 1. / np.sqrt(var + 1e-8)
+    dvar = np.sum(dZ_norm*(activation-miu), axis=0)*(-1.0/2)*((var + 1e-8)**(-3.0/2))
+    dmiu = np.sum(dZ_norm*(-1.0/np.sqrt(var + 1e-8)), axis=0) + dvar*(1.0/N)*np.sum(2.0*(activation-miu), axis=0)
 
-    dvar = np.sum(dZ_norm * activation_centered, axis=0) * -0.5 * var_inv**(-3/2)
-    dmiu = np.sum(dZ_norm * -var_inv, axis=0) + dvar * np.mean(-2.0 * activation_centered, axis=0)
+    dZ = dZ_norm * (1.0/np.sqrt(var + 1e-8)) + dmiu*(1.0/N) + dvar*(2.0/N)*(activation - miu)
 
-    dZ = (dZ_norm * var_inv) + ((dvar * 2 * activation_centered) / N) + (dmiu / N)
     return dZ
 
 def apply_batchnorm(activation):
