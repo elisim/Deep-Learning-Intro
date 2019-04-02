@@ -82,6 +82,8 @@ def L_model_backward(AL, Y, caches, use_batchnorm, batchnorm_cache, dropout_cach
     :param AL: the probabilities vector, the output of the forward propagation (L_model_forward)
     :param Y: the true labels vector (the "ground truth" - true classifications)
     :param caches: list of caches containing for each layer: a) the linear cache; b) the activation cache
+    :param batchnorm_cache: the cache for the batchnorm
+    :param dropout_cache: the cache for the dropout
     :return: a dictionary with the gradients
     """
 
@@ -146,12 +148,18 @@ def L_layer_model(X, Y,
     :param num_iterations: number of iterations
     :param batch_size: the number of examples in a single training batch.
     :param use_batchnorm: use batchnorm or not
+    :param min_epochs: minimum number of epochs to execute before checking stoping criteria
     :param dropout: Scalar between 0 and 1 giving dropout strength.
                     If dropout=1 then the network should not use dropout at all.
-    :return: (parameters, costs) - the parameters learnt by the system during the training (the same parameters
+    :return: (parameters, costs, val_accuracies, train_accuracies, training_last_accuracy, validation_last_accuracu) -
+                                    the parameters learnt by the system during the training (the same parameters
                                     that were updated in the update_parameters function) and the values of the cost
                                     function (calculated by the compute_cost function). One value is to be saved
                                     after each 100 training iterations (e.g. 3000 iterations -> 30 values)..
+                                    val_accuracies - accuracy per 100 iterations on the validation set
+                                    train_accuracies - accuracy per 100 iterations on the training set
+                                    training_last_accuracy - final accuracy on the training set
+                                    validation_last_accuracu - final accuracy on the validation set
     """
     # split to train and val
     X_train, X_val, y_train, y_val = train_test_split(X, Y,
@@ -163,13 +171,14 @@ def L_layer_model(X, Y,
     costs = []
     accs_per_100_iterations = []
     costs_per_100_iterations = []
+    train_accs_pre_100_iterations = []
 
     iterations_counter = 0
     epoch_counter = 0
     val_acc_no_improvement_count = 0
     best_val_acc_value = 0
 
-    while iterations_counter < num_iterations and epoch_counter < min_epochs:
+    while iterations_counter < num_iterations:
         for X_batch, Y_batch in next_batch(X_train, y_train, batch_size):
 
             # forward pass
@@ -191,6 +200,8 @@ def L_layer_model(X, Y,
             val_acc = predict(X_val, y_val, parameters, use_batchnorm)
             if iterations_counter % 100 == 0:
                 accs_per_100_iterations.append(val_acc)
+                train_acc = predict(X_train, y_train, parameters, use_batchnorm)
+                train_accs_pre_100_iterations.append(train_acc)
                 costs_per_100_iterations.append(cost)
                 print('iteration step: {} | cost: {}'.format(iterations_counter, cost))
 
@@ -204,13 +215,12 @@ def L_layer_model(X, Y,
             if val_acc_no_improvement_count >= 100 and epoch_counter >= min_epochs:
                 train_acc = predict(X_train, y_train, parameters, use_batchnorm)
                 val_acc = predict(X_val, y_val, parameters, use_batchnorm)
-                return parameters, costs_per_100_iterations, accs_per_100_iterations, train_acc, val_acc
-
+                return parameters, costs_per_100_iterations, accs_per_100_iterations, train_accs_pre_100_iterations, train_acc, val_acc
         epoch_counter += 1
 
     train_acc = predict(X_train, y_train, parameters, use_batchnorm)
     val_acc = predict(X_val, y_val, parameters, use_batchnorm)
-    return parameters, costs_per_100_iterations, accs_per_100_iterations, train_acc, val_acc
+    return parameters, costs_per_100_iterations, accs_per_100_iterations, train_accs_pre_100_iterations, train_acc, val_acc
 
 
 def predict(X, Y, parameters, use_batchnorm):
@@ -238,4 +248,3 @@ def next_batch(X, y, batchSize):
     for i in np.arange(0, X.shape[0], batchSize):
         # yield a tuple of the current batched data and labels
         yield (X[i: i+batchSize, :], y[i: i+batchSize, :])
-

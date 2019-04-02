@@ -128,30 +128,39 @@ def linear_activation_backward(dA, cache, activation, use_batchnorm, batchnorm_c
     return linear_backward(dZ, linear_cache)
 
 def batchnorm_backward(dZ_norm, batchnorm_cache):
+    # extract backprop for batchnorm from https://deepnotes.io/batchnorm
     activation = batchnorm_cache['activation']
-    activation_normed = batchnorm_cache['activation_norm']
     miu = batchnorm_cache['miu']
     var = batchnorm_cache['var']
 
     N = activation.shape[0]
 
     activation_centered = activation - miu
-    std_inv = 1. / np.sqrt(var + 1e-8)
+    var_inv = 1. / np.sqrt(var + 1e-8)
 
-    dvar = np.sum(dZ_norm * activation_centered, axis=0) * -0.5 * std_inv**3
-    dmiu = np.sum(dZ_norm * -std_inv, axis=0) + dvar * np.mean(-2.0 * activation_centered, axis=0)
+    dvar = np.sum(dZ_norm * activation_centered, axis=0) * -0.5 * var_inv**(-3/2)
+    dmiu = np.sum(dZ_norm * -var_inv, axis=0) + dvar * np.mean(-2.0 * activation_centered, axis=0)
 
-    dZ = (dZ_norm * std_inv) + (dvar * 2 * activation_centered / N) + (dmiu / N)
+    dZ = (dZ_norm * var_inv) + ((dvar * 2 * activation_centered) / N) + (dmiu / N)
     return dZ
 
 def apply_batchnorm(activation):
+    """
+    Description:
+    performs batchnorm on the received activation values of a given layer.
+    Input:
+    A - the activation values of a given layer
+    output:
+    NA - the normalized activation values, based on the formula learned in class
+    batchnorm_cache - cache with the info of the batchnorm forward for backpropogation
+    """
     epsilon =  1e-8
     miu = np.mean(activation, axis=0)
     var = np.var(activation, axis=0)
-    activation_normed = (activation - miu) / np.sqrt(var + epsilon)
-    batchnorm_cache = {'activation': activation, 'activation_norm': activation_normed, 'miu': miu,'var': var}
+    NA = (activation - miu) / np.sqrt(var + epsilon)
+    batchnorm_cache = {'activation': activation, 'activation_norm': NA, 'miu': miu,'var': var}
 
-    return activation_normed, batchnorm_cache
+    return NA, batchnorm_cache
 
 
 def dropout_forward(x, p):
