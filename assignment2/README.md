@@ -1,0 +1,2 @@
+# Assignment 2
+In this assignment we implement Facial Recognition using one-shot learning. The implemention is based on [Siamese Neural Networks for One-shot Image Recognition](http://www.cs.toronto.edu/~gkoch/files/msc-thesis.pdf) article. 
