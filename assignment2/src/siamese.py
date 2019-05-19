@@ -42,35 +42,35 @@ class Siamese():
 
         model.add(KL.Conv2D(64, (10,10), activation='relu', input_shape=input_shape,
                             kernel_initializer=keras.initializers.RandomNormal(mean=0.0, stddev=0.01, seed=84),
-                            bias_initializer=keras.initializers.RandomNormal(mean=0.5, stddev=0.02, seed=84),
+                            bias_initializer=keras.initializers.RandomNormal(mean=0.5, stddev=0.01, seed=84),
                             kernel_regularizer=keras.regularizers.l2(0.01)))
 
         model.add(KL.MaxPool2D())
 
         model.add(KL.Conv2D(128, (7,7), activation='relu',
                             kernel_initializer=keras.initializers.RandomNormal(mean=0.0, stddev=0.01, seed=84),
-                            bias_initializer=keras.initializers.RandomNormal(mean=0.5, stddev=0.02, seed=84),
+                            bias_initializer=keras.initializers.RandomNormal(mean=0.5, stddev=0.01, seed=84),
                             kernel_regularizer=keras.regularizers.l2(0.01)))
 
         model.add(KL.MaxPool2D())
 
         model.add(KL.Conv2D(128, (4,4), activation='relu',
                             kernel_initializer=keras.initializers.RandomNormal(mean=0.0, stddev=0.01, seed=84),
-                            bias_initializer=keras.initializers.RandomNormal(mean=0.5, stddev=0.02, seed=84),
+                            bias_initializer=keras.initializers.RandomNormal(mean=0.5, stddev=0.01, seed=84),
                             kernel_regularizer=keras.regularizers.l2(0.01)))
 
         model.add(KL.MaxPool2D())
 
         model.add(KL.Conv2D(256, (4, 4), activation='relu',
                             kernel_initializer=keras.initializers.RandomNormal(mean=0.0, stddev=0.01, seed=84),
-                            bias_initializer=keras.initializers.RandomNormal(mean=0.5, stddev=0.02, seed=84),
+                            bias_initializer=keras.initializers.RandomNormal(mean=0.5, stddev=0.01, seed=84),
                             kernel_regularizer=keras.regularizers.l2(0.01)))
 
         model.add(KL.Flatten())
 
-        model.add(KL.Dense(2048, activation='sigmoid',
+        model.add(KL.Dense(1024, activation='sigmoid',
                            kernel_initializer=keras.initializers.RandomNormal(mean=0.0, stddev=0.2, seed=84),
-                           bias_initializer=keras.initializers.RandomNormal(mean=0.5, stddev=0.02, seed=84),
+                           bias_initializer=keras.initializers.RandomNormal(mean=0.5, stddev=0.01, seed=84),
                            kernel_regularizer=keras.regularizers.l2(0.01)))
 
         first_hidden = model(first_input)
@@ -81,13 +81,13 @@ class Siamese():
 
         similarity = KL.Dense(1, activation='sigmoid',
                               kernel_initializer=keras.initializers.RandomNormal(mean=0.0, stddev=0.2, seed=84),
-                              bias_initializer=keras.initializers.RandomNormal(mean=0.5, stddev=0.02, seed=84),
+                              bias_initializer=keras.initializers.RandomNormal(mean=0.5, stddev=0.01, seed=84),
                               kernel_regularizer=keras.regularizers.l2(0.01))(L1_distance)
 
         final_network = keras.Model(inputs=[first_input, second_input], outputs=similarity)
 
         # change that
-        optimizer = keras.optimizers.Adam(0.001, decay=0.99)
+        optimizer = keras.optimizers.SGD(lr=0.001, momentum=0.9, decay=0.99)
         final_network.compile(loss="binary_crossentropy",optimizer=optimizer,metrics=['accuracy'])
 
         return final_network
