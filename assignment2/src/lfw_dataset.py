@@ -15,6 +15,9 @@ root='../data/lfw2'
 train_info_url = 'http://vis-www.cs.umass.edu/lfw/pairsDevTrain.txt'
 test_info_url = 'http://vis-www.cs.umass.edu/lfw/pairsDevTest.txt'
 
+np.random.seed(84)
+
+
 def load_data():
     if not (isdir(root) and exists(root)):
         _download()
@@ -28,14 +31,23 @@ def load_data():
     X_train_diff = _load_images(diff_train_paths)
     y_train = np.concatenate([np.ones(len(X_train_same)), np.zeros(len(X_train_diff))])
     X_train = np.concatenate([X_train_same, X_train_diff])
-    X_train = [X_train[:,0], X_train[:, 1]]
+    X_train = [X_train[:, 0], X_train[:, 1]]
 
+    # shuffle
+    perm_train = np.random.permutation(y_train.shape[0])
+    X_train = [X_train[0][perm_train], X_train[1][perm_train]]
+    y_train = y_train[perm_train]
 
     X_test_same = _load_images(same_test_paths)
     X_test_diff = _load_images(diff_test_paths)
     y_test = np.concatenate([np.ones(len(X_test_same)), np.zeros(len(X_test_diff))])
     X_test = np.concatenate([X_test_same, X_test_diff])
     X_test = [X_test[:, 0], X_test[:, 1]]
+
+    # shuffle
+    perm_test = np.random.permutation(y_test.shape[0])
+    X_test = [X_test[0][perm_test], X_test[1][perm_test]]
+    y_test = y_train[perm_test]
 
     return X_train, y_train, X_test, y_test
 
