@@ -7,24 +7,8 @@ KL = keras.layers
 
 class Siamese():
 
-    def __init__(self, X, y, val_size=0, batch_size=32):
-        self.X = X
-        self.y = y
-        self.val_size = val_size
-        self.batch_size = batch_size
-
-        self.image_dim = self.X[0][0].shape[0]
-
-
-    def get_batch(self):
-        # loop over our dataset X in mini-batches of size batchSize
-        for i in np.arange(0, len(self.X[0]), self.batch_size):
-            # inputs = [np.zeros((self.batch_size, self.image_dim, self.image_dim, 1)) for _ in range(2)]
-            # ys = np.zeros((self.batch_size,))
-
-            # yield a tuple of the current batched data and labels
-            yield (self.X[0][i: i + self.batch_size], self.y[i: i + self.batch_size])
-
+    def __init__(self):
+        self.image_dim = 250
 
     def init_network(self):
         # TODO: add weight init

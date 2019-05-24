@@ -10,6 +10,7 @@ from shutil import move
 import requests
 from imageio import imread
 import numpy as np
+import keras
 
 root='../data/lfw2'
 train_info_url = 'http://vis-www.cs.umass.edu/lfw/pairsDevTrain.txt'
@@ -17,8 +18,10 @@ test_info_url = 'http://vis-www.cs.umass.edu/lfw/pairsDevTest.txt'
 
 np.random.seed(84)
 
+IMAGES_DIM = 250
 
-def load_data():
+
+def load_data(val_size=0.2):
     if not (isdir(root) and exists(root)):
         _download()
     else:
@@ -27,29 +30,44 @@ def load_data():
     same_train_paths, diff_train_paths = _extract_samples_paths(train_info_url)
     same_test_paths, diff_test_paths = _extract_samples_paths(test_info_url)
 
-    X_train_same = _load_images(same_train_paths)
-    X_train_diff = _load_images(diff_train_paths)
-    y_train = np.concatenate([np.ones(len(X_train_same)), np.zeros(len(X_train_diff))])
-    X_train = np.concatenate([X_train_same, X_train_diff])
-    X_train = [X_train[:, 0], X_train[:, 1]]
+    # shuffle train samples and split train to train and val
+    same_train_paths = np.random.permutation(same_train_paths)
+    diff_train_paths = np.random.permutation(diff_train_paths)
 
-    # shuffle
-    perm_train = np.random.permutation(y_train.shape[0])
-    X_train = [X_train[0][perm_train], X_train[1][perm_train]]
-    y_train = y_train[perm_train]
+    train_indexes = np.random.permutation(
+        np.concatenate([np.zeros(int(len(same_train_paths)*val_size)), np.ones(int(len(same_train_paths)*(1-val_size)))])).astype(bool)
+    val_indexes = ~train_indexes
 
-    X_test_same = _load_images(same_test_paths)
-    X_test_diff = _load_images(diff_test_paths)
-    y_test = np.concatenate([np.ones(len(X_test_same)), np.zeros(len(X_test_diff))])
-    X_test = np.concatenate([X_test_same, X_test_diff])
-    X_test = [X_test[:, 0], X_test[:, 1]]
+    same_val_paths = same_train_paths[val_indexes]
+    same_train_paths = same_train_paths[train_indexes]
 
-    # shuffle
-    perm_test = np.random.permutation(y_test.shape[0])
-    X_test = [X_test[0][perm_test], X_test[1][perm_test]]
-    y_test = y_train[perm_test]
+    diff_val_paths = diff_train_paths[val_indexes]
+    diff_train_paths = diff_train_paths[train_indexes]
 
-    return X_train, y_train, X_test, y_test
+    # X_train_same = _load_images(same_train_paths)
+    # X_train_diff = _load_images(diff_train_paths)
+    # y_train = np.concatenate([np.ones(len(X_train_same)), np.zeros(len(X_train_diff))])
+    # X_train = np.concatenate([X_train_same, X_train_diff])
+    # X_train = [X_train[:, 0], X_train[:, 1]]
+    #
+    # # shuffle
+    # perm_train = np.random.permutation(y_train.shape[0])
+    # X_train = [X_train[0][perm_train], X_train[1][perm_train]]
+    # y_train = y_train[perm_train]
+    #
+    # X_test_same = _load_images(same_test_paths)
+    # X_test_diff = _load_images(diff_test_paths)
+    # y_test = np.concatenate([np.ones(len(X_test_same)), np.zeros(len(X_test_diff))])
+    # X_test = np.concatenate([X_test_same, X_test_diff])
+    # X_test = [X_test[:, 0], X_test[:, 1]]
+    #
+    # # shuffle
+    # perm_test = np.random.permutation(y_test.shape[0])
+    # X_test = [X_test[0][perm_test], X_test[1][perm_test]]
+    # y_test = y_train[perm_test]
+
+    return same_train_paths, diff_train_paths, same_val_paths, diff_val_paths, same_test_paths, diff_test_paths
+
 
 def size():
     data_root = pathlib.Path(root)
@@ -86,10 +104,63 @@ def _extract_samples_paths(url):
     return same_person_paths, different_person_paths
 
 
-def _load_images(paths):
-    images = []
-    for path_1, path_2 in paths:
-        images_dim = imread(path_1).shape[0]
-        images.append((imread(path_1).reshape(images_dim, images_dim, 1)/255, imread(path_2).reshape(images_dim, images_dim, 1)/255))
-    return images
+def _load_image(path):
+    return imread(path).reshape(IMAGES_DIM, IMAGES_DIM, 1) / 255
 
+
+#class LFWDataLoader(keras.utils.Sequence):
+from tensorflow.python.keras.utils.data_utils import Sequence
+class LFWDataLoader(Sequence):
+    def __init__(self, same_paths, diff_paths, batch_size=32, dim=(250, 250), shuffle=False):
+        if batch_size % 2 != 0:
+            raise(Exception('batch size need to be dividable by 2'))
+        if len(same_paths) != len(diff_paths):
+            raise(Exception('we should have the same amount of paths for similar images and different images'))
+
+        self.dim = dim
+        self.same_paths = same_paths
+        self.diff_paths = diff_paths
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+        self.indexes = np.arange(len(self.same_paths))
+
+        self.on_end_of_epoch()
+
+    def on_end_of_epoch(self):
+        pass
+        # self.indexes = np.arange(len(self.same_paths))
+        # if self.shuffle == True:
+        #     np.random.shuffle(self.indexes)
+
+    def generate_batch(self, image_indexes):
+        X = np.empty((2, self.batch_size, *self.dim, 1), dtype=float)
+        y = np.empty((self.batch_size), dtype=float)
+
+        index = 0
+        for id in image_indexes:
+            X[0, index] = _load_image(self.same_paths[id][0])
+            X[1, index] = _load_image(self.same_paths[id][1])
+            y[index] = 1
+            index += 1
+
+        for id in image_indexes:
+            X[0, index] = _load_image(self.diff_paths[id][0])
+            X[1, index] = _load_image(self.diff_paths[id][1])
+            y[index] = 0
+            index += 1
+
+        perm_test = np.random.permutation(y.shape[0])
+        X[0, ] = X[0, perm_test, ]
+        X[1, ] = X[1, perm_test, ]
+        y = y[perm_test]
+
+        return X, y
+
+    def __len__(self):
+        return int(np.floor((len(self.same_paths) + len(self.diff_paths)) / self.batch_size))
+
+    def __getitem__(self, batch_index):
+        images_indexes = self.indexes[batch_index * int(self.batch_size/2):(batch_index + 1) * int(self.batch_size/2)]
+
+        X, y = self.generate_batch(images_indexes)
+        return [X[0,], X[1,]], y
