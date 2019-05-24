@@ -127,10 +127,9 @@ class LFWDataLoader(Sequence):
         self.on_end_of_epoch()
 
     def on_end_of_epoch(self):
-        pass
-        # self.indexes = np.arange(len(self.same_paths))
-        # if self.shuffle == True:
-        #     np.random.shuffle(self.indexes)
+        self.indexes = np.arange(len(self.same_paths))
+        if self.shuffle == True:
+            np.random.shuffle(self.indexes)
 
     def generate_batch(self, image_indexes):
         X = np.empty((2, self.batch_size, *self.dim, 1), dtype=float)
