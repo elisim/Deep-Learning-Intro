@@ -1,0 +1,17 @@
+architucture
+loss function regularization
+loss function contrasive
+momentum
+batch_size
+learning rate
+learning scheduling
+weight init
+learning schdule - decay
+one-shot validation error
+activation - not relu? (scaled tanh)
+
+
+https://github.com/Kadenze/siamese_net/blob/master/siamese_net.py
+
+https://github.com/Goldesel23/Siamese-Networks-for-One-Shot-Learning/blob/master/siamese_network.py
+https://github.com/4uiiurz1/keras-arcface
