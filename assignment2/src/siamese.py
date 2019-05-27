@@ -99,24 +99,31 @@ class Siamese():
     
         initialize_weights = keras.initializers.RandomNormal(mean=0.0, stddev=0.05, seed=84)  # filters initialize
         initialize_bias = keras.initializers.RandomNormal(mean=0.5, stddev=0.01, seed=84)  # bias initialize
-    
-        vggface = VGGFace(model='resnet50')
-        for layer in vggface.layers:
-            layer.trainable = False
         
         input_shape = (224, 224, 3)
         first_input = KL.Input(input_shape)
         second_input = KL.Input(input_shape)
         
-        first_hidden = vggface(first_input)
-        second_hidden = vggface(second_input)
-
+        vggface = VGGFace(model='resnet50')
+        vggface.layers.pop()
+        for layer in vggface.layers:
+            layer.trainable = False
+        
+        new_model = keras.Sequential()
+        new_model.add(vggface)
+        new_model.add(KL.Dense(128, activation='sigmoid', kernel_initializer=initialize_weights, bias_initializer=initialize_bias))
+        new_model.add(KL.Dropout(0.25))
+        
+        first_hidden = new_model(first_input)
+        second_hidden = new_model(second_input)
+        
         L1_layer = KL.Lambda(lambda tensors: K.abs(tensors[0] - tensors[1]))
         L1_distance = L1_layer([first_hidden, second_hidden])
-        similarity = KL.Dense(1, activation='sigmoid', bias_initializer=initialize_bias)(L1_distance)
+        similarity = KL.Dense(1, activation='sigmoid', kernel_initializer=initialize_weights, bias_initializer=initialize_bias)(L1_distance)
 
         final_network = keras.Model(inputs=[first_input, second_input], outputs=similarity)
-        optimizer = keras.optimizers.SGD(lr=self.lr, momentum=self.momentum, decay=self.decay)
+        #optimizer = keras.optimizers.SGD(lr=self.lr, momentum=self.momentum, decay=self.decay)
+        optimizer = keras.optimizers.Adam(lr=self.lr)
         final_network.compile(loss="binary_crossentropy", optimizer=optimizer, metrics=self.metrics)
         
         self.model = final_network
