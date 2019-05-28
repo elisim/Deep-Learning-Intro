@@ -159,6 +159,9 @@ class Siamese():
         
     
     def test(self, same_test_paths, diff_test_paths, epoch_shuffle=False):
-        test_generator = LFWDataLoader(same_test_paths, diff_test_paths, shuffle=epoch_shuffle)
+        if self.model_type == 'vggface':
+            test_generator = LFWDataLoaderVGG(same_test_paths, diff_test_paths, shuffle=epoch_shuffle)
+        else:
+            test_generator = LFWDataLoader(same_test_paths, diff_test_paths, shuffle=epoch_shuffle)
         loss, accuracy = self.model.evaluate_generator(test_generator, verbose=1)
         return loss, accuracy
