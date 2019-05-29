@@ -49,12 +49,16 @@ def load_data(val_size=0.2):
 
     return same_train_paths, diff_train_paths, same_val_paths, diff_val_paths, same_test_paths, diff_test_paths
 
-def size():
+def n_images():
     data_root = pathlib.Path(root)
     all_image_paths = [str(path) for path in list(data_root.glob('*/*'))]
-    random.shuffle(all_image_paths)
     return len(all_image_paths)
         
+def n_entities():
+    data_root = pathlib.Path(root)
+    all_entities_paths = [str(path) for path in list(data_root.glob('*'))]
+    return len(all_entities_paths)
+
 def _download():
     dest = root + '.zip'
     print("Started Downloading Labeled Faces in the Wild...")

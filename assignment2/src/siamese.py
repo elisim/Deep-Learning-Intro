@@ -111,8 +111,11 @@ class Siamese():
         
         new_model = keras.Sequential()
         new_model.add(vggface)
-        new_model.add(KL.Dense(128, activation='sigmoid', kernel_initializer=initialize_weights, bias_initializer=initialize_bias))
-        new_model.add(KL.Dropout(0.25))
+        new_model.add(KL.Dense(512, activation='relu', kernel_initializer=initialize_weights, bias_initializer=initialize_bias))
+        new_model.add(KL.Dropout(0.2))
+        new_model.add(KL.Dense(512, activation='relu', kernel_initializer=initialize_weights, bias_initializer=initialize_bias))
+        new_model.add(KL.Dropout(0.2))
+        new_model.add(KL.Dense(512, activation='sigmoid', kernel_initializer=initialize_weights, bias_initializer=initialize_bias))
         
         first_hidden = new_model(first_input)
         second_hidden = new_model(second_input)
