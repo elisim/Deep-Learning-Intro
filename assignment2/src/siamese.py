@@ -42,8 +42,44 @@ class Siamese():
         #TODO: implement
         pass
     
+    def build_article_network(self):
+        input_shape = (self.image_dim, self.image_dim, 1)
+        first_input = KL.Input(input_shape)
+        second_input = KL.Input(input_shape)
+        
+        model = keras.Sequential()
+        initialize_weights = keras.initializers.RandomNormal(mean=0.0, stddev=0.05, seed=84)  # filters initialize
+        initialize_bias = keras.initializers.RandomNormal(mean=0.5, stddev=0.01, seed=84)  # bias initialize
+        
+        model.add(KL.Conv2D(64, (10, 10), activation='relu', input_shape=input_shape))
+        model.add(KL.MaxPool2D())
+        
+        model.add(KL.Conv2D(128, (7, 7), activation='relu'))
+        model.add(KL.MaxPool2D())
+        
+        model.add(KL.Conv2D(128, (4, 4), activation='relu'))
+        model.add(KL.MaxPool2D())
+        
+        model.add(KL.Conv2D(256, (4,4), activation='relu'))
+        
+        model.add(KL.Flatten())
+        model.add(KL.Dense(512, activation='sigmoid'))
+        
+        hidden_first = model(first_input)
+        hidden_second = model(second_input)
+        
+        L1_layer = KL.Lambda(lambda tensors: K.abs(tensors[0] - tensors[1]))
+        L1_distance = L1_layer([hidden_first, hidden_second])
+        similarity = KL.Dense(1, activation='sigmoid', bias_initializer=initialize_bias)(L1_distance)
+        
+        final_network = keras.Model(inputs=[first_input, second_input], outputs=similarity)
+        optimizer = keras.optimizers.SGD(lr=self.lr, momentum=self.momentum, decay=self.decay)
+        final_network.compile(loss=self.loss, optimizer=optimizer, metrics=self.metrics)
+
+        self.model = final_network
+        return final_network
     
-    def build_hani(self):
+    def build_custom_network(self):
         input_shape = (self.image_dim, self.image_dim, 1)
         first_input = KL.Input(input_shape)
         second_input = KL.Input(input_shape)
@@ -86,6 +122,7 @@ class Siamese():
         
         final_network = keras.Model(inputs=[first_input, second_input], outputs=similarity)
         optimizer = keras.optimizers.SGD(lr=self.lr, momentum=self.momentum, decay=self.decay)
+        #optimizer = keras.optimizers.Adam(lr=self.lr)
         final_network.compile(loss=self.loss, optimizer=optimizer, metrics=self.metrics)
 
         self.model = final_network
@@ -104,7 +141,7 @@ class Siamese():
         first_input = KL.Input(input_shape)
         second_input = KL.Input(input_shape)
         
-        vggface = VGGFace(model='resnet50')
+        vggface = VGGFace(model='vgg16')
         vggface.layers.pop()
         for layer in vggface.layers:
             layer.trainable = False

@@ -90,7 +90,7 @@ def _load_image(path):
     return imread(path).reshape(IMAGES_DIM, IMAGES_DIM, 1) / 255  # normalize rgb to 0-1
 
 
-class LFWDataLoader(Sequence):
+class LFWDataLoader(keras.utils.Sequence):
     def __init__(self, same_paths, diff_paths, batch_size=32, dim=(IMAGES_DIM, IMAGES_DIM), shuffle=False):
         if batch_size % 2 != 0:
             raise(Exception('batch size need to be dividable by 2'))
