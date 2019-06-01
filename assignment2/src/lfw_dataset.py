@@ -25,8 +25,8 @@ IMAGES_DIM = 250
 VGG_IMAGES_DIM = 224
 
 def load_data(val_size=0.2):
-    root='../data/lfw2'
-    val_size=0.2
+    root='../data/lfw2' # TODO: delete after finish with Hyperas
+    val_size=0.2 # TODO: delete after finish with Hyperas
 
     if not (isdir(root) and exists(root)):
         _download()
@@ -81,10 +81,10 @@ def _extract_samples_paths(url):
     assert(len(file_text) == amount_of_samples*2 + 2)
 
     same_person_paths = [((sample[0], sample[1].zfill(4)), (sample[0], sample[2].zfill(4))) for sample in [line.split('\t') for line in file_text[1:amount_of_samples+1]]]
-    same_person_paths = [(path.join('../data/lfw2/{}/{}_{}.jpg'.format(per_1,per_1,index_1)), path.join('../data/lfw2/{}/{}_{}.jpg'.format(per_2,per_2, index_2))) for (per_1,index_1),(per_2, index_2) in same_person_paths]
+    same_person_paths = [(path.join(root, per_1, '{}_{}.jpg'.format(per_1,index_1)), path.join(root, per_2, '{}_{}.jpg'.format(per_2, index_2))) for (per_1,index_1),(per_2, index_2) in same_person_paths]
 
     different_person_paths = [((sample[0], sample[1].zfill(4)), (sample[2], sample[3].zfill(4))) for sample in [line.split('\t') for line in file_text[amount_of_samples+1:-1]]]
-    different_person_paths = [(path.join('../data/lfw2/{}/{}_{}.jpg'.format(per_1,per_1,index_1)), path.join('../data/lfw2/{}/{}_{}.jpg'.format(per_2,per_2, index_2))) for (per_1,index_1),(per_2, index_2) in different_person_paths]
+    different_person_paths = [(path.join(root, per_1, '{}_{}.jpg'.format(per_1,index_1)), path.join(root, per_2,'{}_{}.jpg'.format(per_2, index_2))) for (per_1,index_1),(per_2, index_2) in different_person_paths]
 
     return same_person_paths, different_person_paths
 
@@ -97,7 +97,7 @@ def perpare_triplets():
     
 
 class LFWDataLoader(keras.utils.Sequence):
-    def __init__(self, same_paths, diff_paths, batch_size=32, dim=(IMAGES_DIM, IMAGES_DIM), shuffle=False):
+    def __init__(self, same_paths, diff_paths, batch_size=32, dim=(IMAGES_DIM, IMAGES_DIM), load_image_func=_load_image, shuffle=False):
         if batch_size % 2 != 0:
             raise(Exception('batch size need to be dividable by 2'))
         if len(same_paths) != len(diff_paths):
@@ -159,7 +159,7 @@ def _load_image_vgg(path):
 
 
 class LFWDataLoaderVGG(keras.utils.Sequence):
-    def __init__(self, same_paths, diff_paths, batch_size=32, dim=(VGG_IMAGES_DIM, VGG_IMAGES_DIM), shuffle=False):
+    def __init__(self, same_paths, diff_paths, batch_size=32, dim=(VGG_IMAGES_DIM, VGG_IMAGES_DIM), load_image_func=_lo shuffle=False):
         if batch_size % 2 != 0:
             raise(Exception('batch size need to be dividable by 2'))
         if len(same_paths) != len(diff_paths):
