@@ -25,6 +25,9 @@ IMAGES_DIM = 250
 VGG_IMAGES_DIM = 224
 
 def load_data(val_size=0.2):
+    root='../data/lfw2'
+    val_size=0.2
+
     if not (isdir(root) and exists(root)):
         _download()
     else:
@@ -89,6 +92,9 @@ def _extract_samples_paths(url):
 def _load_image(path):
     return imread(path).reshape(IMAGES_DIM, IMAGES_DIM, 1) / 255  # normalize rgb to 0-1
 
+def perpare_triplets():
+    pass
+    
 
 class LFWDataLoader(keras.utils.Sequence):
     def __init__(self, same_paths, diff_paths, batch_size=32, dim=(IMAGES_DIM, IMAGES_DIM), shuffle=False):
