@@ -1,7 +1,7 @@
 import tensorflow as tf
 from keras.regularizers import l2
-import lfw_dataset
-from lfw_dataset import LFWDataLoader, LFWDataLoaderVGG
+import src.lfw_dataset
+from src.lfw_dataset import LFWDataLoader, LFWDataLoaderVGG
 from sklearn.metrics import roc_auc_score, roc_curve
 
 from sklearn.externals import joblib
@@ -67,31 +67,45 @@ class Siamese:
         joblib.dump(best_run, 'best_run_transfer.jblib')
         joblib.dump(trials, 'transfer_all_trials_data.jblib')
         
-    def build_paper_network(self):
+    def build_paper_network(self, model_params=None):
         """
         :return: the network the mentioned in the original paper.
         """
+        
+        if model_params is None:
+            model_params = {
+                'l2_conv1': 1e-2,
+                'l2_conv2': 1e-2,
+                'l2_conv3': 1e-2,
+                'l2_conv4': 1e-2,
+                'l2_dense': 1e-4,
+                'learning_rate': 1e-3,
+                'momentum': 0.5,
+                'decay': 0.01
+            }
+        
         input_shape = (self.image_dim, self.image_dim, 1)
         first_input = KL.Input(input_shape)
         second_input = KL.Input(input_shape)
         
         model = keras.Sequential()
-        initialize_weights = keras.initializers.RandomNormal(mean=0.0, stddev=0.05, seed=84)  # filters initialize
+        initialize_weights_conv = keras.initializers.RandomNormal(mean=0.0, stddev=0.01, seed=84)  # filters initialize
+        initialize_weights_dense = keras.initializers.RandomNormal(mean=0.0, stddev=0.2, seed=84)  # filters initialize
         initialize_bias = keras.initializers.RandomNormal(mean=0.5, stddev=0.01, seed=84)  # bias initialize
         
-        model.add(KL.Conv2D(64, (10, 10), activation='relu', input_shape=input_shape))
+        model.add(KL.Conv2D(64, (10, 10), activation='relu', kernel_regularizer=l2(model_params['l2_conv1']), kernel_initializer=initialize_weights_conv, bias_initializer=initialize_bias, input_shape=input_shape))
         model.add(KL.MaxPool2D())
         
-        model.add(KL.Conv2D(128, (7, 7), activation='relu'))
+        model.add(KL.Conv2D(128, (7, 7), activation='relu', kernel_regularizer=l2(model_params['l2_conv2']), kernel_initializer=initialize_weights_conv, bias_initializer=initialize_bias))
         model.add(KL.MaxPool2D())
         
-        model.add(KL.Conv2D(128, (4, 4), activation='relu'))
+        model.add(KL.Conv2D(128, (4, 4), activation='relu', kernel_regularizer=l2(model_params['l2_conv3']), kernel_initializer=initialize_weights_conv, bias_initializer=initialize_bias))
         model.add(KL.MaxPool2D())
         
-        model.add(KL.Conv2D(256, (4,4), activation='relu'))
+        model.add(KL.Conv2D(256, (4,4), activation='relu', kernel_regularizer=l2(model_params['l2_conv4']), kernel_initializer=initialize_weights_conv, bias_initializer=initialize_bias))
         
         model.add(KL.Flatten())
-        model.add(KL.Dense(512, activation='sigmoid'))
+        model.add(KL.Dense(1024, activation='sigmoid', kernel_regularizer=l2(model_params['l2_dense']), kernel_initializer=initialize_weights_dense, bias_initializer=initialize_bias))
         
         hidden_first = model(first_input)
         hidden_second = model(second_input)
@@ -101,7 +115,7 @@ class Siamese:
         similarity = KL.Dense(1, activation='sigmoid', bias_initializer=initialize_bias)(L1_distance)
         
         final_network = keras.Model(inputs=[first_input, second_input], outputs=similarity)
-        optimizer = keras.optimizers.SGD(lr=self.lr, momentum=self.momentum, decay=self.decay)
+        optimizer = keras.optimizers.SGD(lr=model_params['learning_rate'], momentum=model_params['momentum'], decay=model_params['decay'])
         final_network.compile(loss=self.loss, optimizer=optimizer, metrics=self.metrics)
 
         self.model = final_network
@@ -116,7 +130,8 @@ class Siamese:
         second_input = KL.Input(input_shape)
 
         model = keras.Sequential()
-        initialize_weights = keras.initializers.RandomNormal(mean=0.0, stddev=0.05, seed=84)  # filters initialize
+        initialize_weights_conv = keras.initializers.RandomNormal(mean=0.0, stddev=0.01, seed=84)  # filters initialize
+        initialize_weights_dense = keras.initializers.RandomNormal(mean=0.0, stddev=0.2, seed=84)  # filters initialize
         initialize_bias = keras.initializers.RandomNormal(mean=0.5, stddev=0.01, seed=84)  # bias initialize
 
         model.add(KL.Conv2D(5, (6, 6), strides=(2, 2), activation='relu', input_shape=input_shape,
@@ -209,18 +224,19 @@ class Siamese:
               diff_val_paths, 
               batch_size=32, 
               epochs=40, 
-              epoch_shuffle=False):
+              epoch_shuffle=False, earlystop_patience=10):
         
         if self.model_type == 'vggface':
-            training_generator = LFWDataLoaderVGG(same_train_paths, diff_train_paths, shuffle=epoch_shuffle, batch_size=batch_size)
-            validation_generator = LFWDataLoaderVGG(same_val_paths, diff_val_paths, shuffle=epoch_shuffle, batch_size=batch_size)            
+            training_generator = LFWDataLoader(same_train_paths, diff_train_paths, shuffle=epoch_shuffle, batch_size=batch_size, channels=3, load_image_func=_load_image_vgg)
+            validation_generator = LFWDataLoader(same_val_paths, diff_val_paths, shuffle=epoch_shuffle, batch_size=batch_size, channels=3, load_image_func=_load_image_vgg)            
         else:
             training_generator = LFWDataLoader(same_train_paths, diff_train_paths, shuffle=epoch_shuffle, batch_size=batch_size)
             validation_generator = LFWDataLoader(same_val_paths, diff_val_paths, shuffle=epoch_shuffle, batch_size=batch_size)
     
         history = self.model.fit_generator(generator=training_generator,
                     validation_data=validation_generator,
-                    use_multiprocessing=False, verbose=1, epochs=epochs)
+                    use_multiprocessing=False, verbose=1, epochs=epochs,
+                    callbacks=[keras.callbacks.EarlyStopping(patience=10, verbose=1)])
         
         return history
     

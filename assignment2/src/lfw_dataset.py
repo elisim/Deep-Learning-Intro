@@ -97,13 +97,15 @@ def perpare_triplets():
     
 
 class LFWDataLoader(keras.utils.Sequence):
-    def __init__(self, same_paths, diff_paths, batch_size=32, dim=(IMAGES_DIM, IMAGES_DIM), load_image_func=_load_image, shuffle=False):
+    def __init__(self, same_paths, diff_paths, batch_size=32, dim=(IMAGES_DIM, IMAGES_DIM), channels=1, load_image_func=_load_image, shuffle=False):
         if batch_size % 2 != 0:
             raise(Exception('batch size need to be dividable by 2'))
         if len(same_paths) != len(diff_paths):
             raise(Exception('we should have the same amount of paths for similar images and different images'))
 
         self.dim = dim
+        self.channels = channels
+        self.load_image_func = load_image_func
         self.same_paths = same_paths
         self.diff_paths = diff_paths
         self.batch_size = batch_size
@@ -123,14 +125,14 @@ class LFWDataLoader(keras.utils.Sequence):
 
         index = 0
         for id in image_indexes:
-            X[0, index] = _load_image(self.same_paths[id][0])
-            X[1, index] = _load_image(self.same_paths[id][1])
+            X[0, index] = self.load_image_func(self.same_paths[id][0])
+            X[1, index] = self.load_image_func(self.same_paths[id][1])
             y[index] = 1
             index += 1
 
         for id in image_indexes:
-            X[0, index] = _load_image(self.diff_paths[id][0])
-            X[1, index] = _load_image(self.diff_paths[id][1])
+            X[0, index] = self.load_image_func(self.diff_paths[id][0])
+            X[1, index] = self.load_image_func(self.diff_paths[id][1])
             y[index] = 0
             index += 1
 
@@ -152,62 +154,13 @@ class LFWDataLoader(keras.utils.Sequence):
 
 
 def _load_image_vgg(path):
+    """
+    Load an image to be ready for the VGG16 model.
+    """
+    # load the image from the disk
     gray_image = imread(path)
+    # transform the grayscale image to RGB
     backtorgb = cv2.cvtColor(gray_image,cv2.COLOR_GRAY2RGB)
+    # rezise the image to fit the VGG16 model shape
     resized_image = cv2.resize(backtorgb, dsize=(VGG_IMAGES_DIM, VGG_IMAGES_DIM), interpolation=cv2.INTER_CUBIC)
     return resized_image.reshape(1,224,224,3)
-
-
-class LFWDataLoaderVGG(keras.utils.Sequence):
-    def __init__(self, same_paths, diff_paths, batch_size=32, dim=(VGG_IMAGES_DIM, VGG_IMAGES_DIM), load_image_func=_lo shuffle=False):
-        if batch_size % 2 != 0:
-            raise(Exception('batch size need to be dividable by 2'))
-        if len(same_paths) != len(diff_paths):
-            raise(Exception('we should have the same amount of paths for similar images and different images'))
-
-        self.dim = dim
-        self.same_paths = same_paths
-        self.diff_paths = diff_paths
-        self.batch_size = batch_size
-        self.shuffle = shuffle
-        self.indexes = np.arange(len(self.same_paths))
-
-        self.on_end_of_epoch()
-
-    def on_end_of_epoch(self):
-        self.indexes = np.arange(len(self.same_paths))
-        if self.shuffle == True:
-            np.random.shuffle(self.indexes)
-
-    def generate_batch(self, image_indexes):
-        X = np.empty((2, self.batch_size, *self.dim, 3), dtype=float)
-        y = np.empty(self.batch_size, dtype=float)
-
-        index = 0
-        for id in image_indexes:
-            X[0, index] = _load_image_vgg(self.same_paths[id][0])
-            X[1, index] = _load_image_vgg(self.same_paths[id][1])
-            y[index] = 1
-            index += 1
-
-        for id in image_indexes:
-            X[0, index] = _load_image_vgg(self.diff_paths[id][0])
-            X[1, index] = _load_image_vgg(self.diff_paths[id][1])
-            y[index] = 0
-            index += 1
-
-        perm_test = np.random.permutation(y.shape[0])
-        X[0, ] = X[0, perm_test, ]
-        X[1, ] = X[1, perm_test, ]
-        y = y[perm_test]
-
-        return X, y
-
-    def __len__(self):
-        return int(np.floor((len(self.same_paths) + len(self.diff_paths)) / self.batch_size))
-
-    def __getitem__(self, batch_index):
-        images_indexes = self.indexes[batch_index * int(self.batch_size/2):(batch_index + 1) * int(self.batch_size/2)]
-
-        X, y = self.generate_batch(images_indexes)
-        return [X[0,], X[1,]], y
