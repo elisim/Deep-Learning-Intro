@@ -1,18 +1,15 @@
 import tensorflow as tf
 from keras.regularizers import l2
 import src.lfw_dataset
-from src.lfw_dataset import LFWDataLoader, LFWDataLoaderVGG
+from src.lfw_dataset import LFWDataLoader
 from sklearn.metrics import roc_auc_score, roc_curve
-
 from sklearn.externals import joblib
-
 import keras
 
 from hyperas.distributions import choice, uniform
 from hyperopt import Trials, STATUS_OK, tpe
 from hyperas import optim
 
-#keras = tf.keras
 K = keras.backend
 KL = keras.layers
 
@@ -37,6 +34,7 @@ class Siamese:
         self.metrics = metrics
         self.loss = loss
         self.batchnorm = batchnorm
+        self.model_type = None
     
     def build(self, model='hani', model_params=None):
         """
@@ -51,6 +49,46 @@ class Siamese:
         else:
             network = model()
         return network
+    
+    
+    def train(self, 
+              same_train_paths,       
+              diff_train_paths, 
+              same_val_paths, 
+              diff_val_paths, 
+              batch_size=32, 
+              epochs=40, 
+              epoch_shuffle=False, 
+              earlystop_patience=10
+              verbose=2):
+        
+        if self.model_type == 'vggface':
+            training_generator = LFWDataLoader(same_train_paths, diff_train_paths, shuffle=epoch_shuffle, batch_size=batch_size, channels=3, load_image_func=_load_image_vgg)
+            validation_generator = LFWDataLoader(same_val_paths, diff_val_paths, shuffle=epoch_shuffle, batch_size=batch_size, channels=3, load_image_func=_load_image_vgg)            
+        else:
+            training_generator = LFWDataLoader(same_train_paths, diff_train_paths, shuffle=epoch_shuffle, batch_size=batch_size)
+            validation_generator = LFWDataLoader(same_val_paths, diff_val_paths, shuffle=epoch_shuffle, batch_size=batch_size)
+    
+        history = self.model.fit_generator(generator=training_generator,
+                    validation_data=validation_generator,
+                    use_multiprocessing=False, verbose=verbose, epochs=epochs,
+                    callbacks=[keras.callbacks.EarlyStopping(patience=10, verbose=1)])
+        
+        return history  
+
+    def predict(self, same_paths, diff_paths):
+        ##### TODO do flatten on gen
+        generator = LFWDataLoader(same_test_paths, diff_test_paths, batch_size=len(same_paths)*2, shuffle=False)
+        X,y = list(generator)
+        return self.model.predict(X), y
+    
+    def test(self, same_test_paths, diff_test_paths, epoch_shuffle=False):
+        if self.model_type == 'vggface':
+            test_generator = LFWDataLoaderVGG(same_test_paths, diff_test_paths, shuffle=epoch_shuffle)
+        else:
+            test_generator = LFWDataLoader(same_test_paths, diff_test_paths, shuffle=epoch_shuffle)
+        loss, accuracy = self.model.evaluate_generator(test_generator, verbose=1)
+        return loss, accuracy
     
     def run_hyperas_experiment(self):
         """
@@ -216,44 +254,6 @@ class Siamese:
         if self.batchnorm: 
             model.add(KL.BatchNormalization())
         return model
-
-    def train(self, 
-              same_train_paths,       
-              diff_train_paths, 
-              same_val_paths, 
-              diff_val_paths, 
-              batch_size=32, 
-              epochs=40, 
-              epoch_shuffle=False, earlystop_patience=10):
-        
-        if self.model_type == 'vggface':
-            training_generator = LFWDataLoader(same_train_paths, diff_train_paths, shuffle=epoch_shuffle, batch_size=batch_size, channels=3, load_image_func=_load_image_vgg)
-            validation_generator = LFWDataLoader(same_val_paths, diff_val_paths, shuffle=epoch_shuffle, batch_size=batch_size, channels=3, load_image_func=_load_image_vgg)            
-        else:
-            training_generator = LFWDataLoader(same_train_paths, diff_train_paths, shuffle=epoch_shuffle, batch_size=batch_size)
-            validation_generator = LFWDataLoader(same_val_paths, diff_val_paths, shuffle=epoch_shuffle, batch_size=batch_size)
-    
-        history = self.model.fit_generator(generator=training_generator,
-                    validation_data=validation_generator,
-                    use_multiprocessing=False, verbose=1, epochs=epochs,
-                    callbacks=[keras.callbacks.EarlyStopping(patience=10, verbose=1)])
-        
-        return history
-    
-    def predict(self, same_paths, diff_paths):
-        ##### TODO do flatten on gen
-        generator = LFWDataLoader(same_test_paths, diff_test_paths, batch_size=len(same_paths)*2, shuffle=False)
-        X,y = list(generator)
-        return self.model.predict(X), y
-    
-    def test(self, same_test_paths, diff_test_paths, epoch_shuffle=False):
-        if self.model_type == 'vggface':
-            test_generator = LFWDataLoaderVGG(same_test_paths, diff_test_paths, shuffle=epoch_shuffle)
-        else:
-            test_generator = LFWDataLoader(same_test_paths, diff_test_paths, shuffle=epoch_shuffle)
-        loss, accuracy = self.model.evaluate_generator(test_generator, verbose=1)
-        return loss, accuracy
-
 
 
 def hyperas_build_custom_network(same_train_paths, diff_train_paths, same_val_paths, diff_val_paths, same_test_paths, diff_test_paths):

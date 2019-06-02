@@ -24,6 +24,7 @@ np.random.seed(84)
 IMAGES_DIM = 250
 VGG_IMAGES_DIM = 224
 
+
 def load_data(val_size=0.2):
     root='../data/lfw2' # TODO: delete after finish with Hyperas
     val_size=0.2 # TODO: delete after finish with Hyperas
@@ -52,15 +53,18 @@ def load_data(val_size=0.2):
 
     return same_train_paths, diff_train_paths, same_val_paths, diff_val_paths, same_test_paths, diff_test_paths
 
+
 def n_images():
     data_root = pathlib.Path(root)
     all_image_paths = [str(path) for path in list(data_root.glob('*/*'))]
     return len(all_image_paths)
-        
+
+
 def n_entities():
     data_root = pathlib.Path(root)
     all_entities_paths = [str(path) for path in list(data_root.glob('*'))]
     return len(all_entities_paths)
+
 
 def _download():
     dest = root + '.zip'
@@ -72,7 +76,8 @@ def _download():
         move(join(root, 'lfw2', filename), join(root, filename))
     remove(dest)
     print("Data downloaded successfully")
-    
+
+
 def _extract_samples_paths(url):
     response = requests.get(url)
     file_text = response.text.split('\n')
@@ -91,6 +96,20 @@ def _extract_samples_paths(url):
 
 def _load_image(path):
     return imread(path).reshape(IMAGES_DIM, IMAGES_DIM, 1) / 255  # normalize rgb to 0-1
+
+
+def _load_image_vgg(path):
+    """
+    Load an image to be ready for the VGG16 model.
+    """
+    # load the image from the disk
+    gray_image = imread(path)
+    # transform the grayscale image to RGB
+    backtorgb = cv2.cvtColor(gray_image,cv2.COLOR_GRAY2RGB)
+    # rezise the image to fit the VGG16 model shape
+    resized_image = cv2.resize(backtorgb, dsize=(VGG_IMAGES_DIM, VGG_IMAGES_DIM), interpolation=cv2.INTER_CUBIC)
+    return resized_image.reshape(1,224,224,3)
+
 
 def perpare_triplets():
     pass
@@ -152,15 +171,3 @@ class LFWDataLoader(keras.utils.Sequence):
         X, y = self.generate_batch(images_indexes)
         return [X[0,], X[1,]], y
 
-
-def _load_image_vgg(path):
-    """
-    Load an image to be ready for the VGG16 model.
-    """
-    # load the image from the disk
-    gray_image = imread(path)
-    # transform the grayscale image to RGB
-    backtorgb = cv2.cvtColor(gray_image,cv2.COLOR_GRAY2RGB)
-    # rezise the image to fit the VGG16 model shape
-    resized_image = cv2.resize(backtorgb, dsize=(VGG_IMAGES_DIM, VGG_IMAGES_DIM), interpolation=cv2.INTER_CUBIC)
-    return resized_image.reshape(1,224,224,3)
