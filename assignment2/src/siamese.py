@@ -193,7 +193,14 @@ class Siamese:
     def build_custom_network_constrastive_loss(self):
         pass
     
-    def build_custom_network(self):
+    def build_custom_network(self, **model_params):
+        act = model_params.get('act', 'relu')
+        tanh_A = 1.7159
+        tanh_B = 2/3
+        ## Todo: define act = A * tanh(Bx)
+        
+        
+        
         input_shape = (self.image_dim, self.image_dim, 1)
         first_input = KL.Input(input_shape)
         second_input = KL.Input(input_shape)
