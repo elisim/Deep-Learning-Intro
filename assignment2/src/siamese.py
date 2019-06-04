@@ -1,7 +1,7 @@
-import tensorflow as tf
-from keras.regularizers import l2
 import src.lfw_dataset
 from src.lfw_dataset import LFWDataLoader, _load_image_vgg
+import tensorflow as tf
+from keras.regularizers import l2
 from sklearn.metrics import roc_auc_score, roc_curve
 from sklearn.externals import joblib
 import keras
@@ -20,7 +20,6 @@ session = tf.Session(config=config)
 
 
 class Siamese:
-    ### TODO: Class models that contain all the "build models"
     def __init__(self, lr=1e-4, 
                        momentum=0.9, 
                        decay=0.01,
@@ -36,7 +35,7 @@ class Siamese:
         self.batchnorm = batchnorm
         self.model_type = None
     
-    def build(self, model='hani', model_params=None):
+    def build(self, model='hani', **model_params):
         """
         :param model: model name
         :param model_params: model params
@@ -45,11 +44,10 @@ class Siamese:
         self.model_type = model
         model = getattr(self, 'build_' + model)
         if model_params:
-            network = model(model_params)
+            network = model(**model_params)
         else:
             network = model()
         return network
-    
     
     def train(self, 
               same_train_paths,       
@@ -82,7 +80,7 @@ class Siamese:
         X,y = list(generator)
         return self.model.predict(X), y
     
-    def evaluate(self, ):
+    def evaluate(self, train_history, same_test_paths, diff_test_paths):
         fig, axes = plt.subplots(1, 2)
         fig.set_figheight(7)
         fig.set_figwidth(14)
@@ -132,24 +130,27 @@ class Siamese:
         joblib.dump(best_run, 'best_run_transfer.jblib')
         joblib.dump(trials, 'transfer_all_trials_data.jblib')
         
-    def build_paper_network(self, model_params=None):
+    def build_paper_network(self, **model_params):
         """
         :return: the network the mentioned in the original paper.
         """
-        
-        if model_params is None:
-            model_params = {
-                'l2_conv1': 1e-2,
-                'l2_conv2': 1e-2,
-                'l2_conv3': 1e-2,
-                'l2_conv4': 1e-2,
-                'l2_dense': 1e-4,
-                'learning_rate': 1e-3,
-                'dense_size': 4096,
-                'momentum': 0.5,
-                'filter_size_conv1': 10,
-                'decay': 0.01
-            }
+        filter_size_conv1 = model_params.get('filter_size_conv1', 10)
+        filter_size_conv2 = model_params.get('filter_size_conv2', 7)
+        filter_size_conv3 = model_params.get('filter_size_conv3', 4)
+        filter_size_conv4 = model_params.get('filter_size_conv4', 4)
+        n_filters_conv1 = model_params.get('n_filters_conv1', 64)
+        n_filters_conv2 = model_params.get('n_filters_conv2', 128)
+        n_filters_conv3 = model_params.get('n_filters_conv3', 128)
+        n_filters_conv4 = model_params.get('n_filters_conv4', 256)
+        l2_conv1 = model_params.get('l2_conv1', 1e-2)
+        l2_conv2 = model_params.get('l2_conv2', 1e-2)
+        l2_conv3 = model_params.get('l2_conv3', 1e-2)
+        l2_conv4 = model_params.get('l2_conv4', 1e-2)
+        l2_dense = model_params.get('l2_dense', 1e-4)
+        learning_rate = model_params.get('learning_rate', 1e-3)
+        dense_size = model_params.get('dense_size', 4096)
+        momentum = model_params.get('momentum',  0.5)
+        decay = model_params.get('decay',  0.01)
         
         input_shape = (self.image_dim, self.image_dim, 1)
         first_input = KL.Input(input_shape)
@@ -157,22 +158,22 @@ class Siamese:
         
         model = keras.Sequential()
         initialize_weights_conv = keras.initializers.RandomNormal(mean=0.0, stddev=0.01, seed=84)  # filters initialize
-        initialize_weights_dense = keras.initializers.RandomNormal(mean=0.0, stddev=0.2, seed=84)  # filters initialize
+        initialize_weights_dense = keras.initializers.RandomNormal(mean=0.0, stddev=0.2, seed=84)  # dense initialize
         initialize_bias = keras.initializers.RandomNormal(mean=0.5, stddev=0.01, seed=84)  # bias initialize
         
-        model.add(KL.Conv2D(64, (model_params['filter_size_conv1'], model_params['filter_size_conv1']), activation='relu', kernel_regularizer=l2(model_params['l2_conv1']), kernel_initializer=initialize_weights_conv, bias_initializer=initialize_bias, input_shape=input_shape))
+        model.add(KL.Conv2D(n_filters_conv1, (filter_size_conv1, filter_size_conv1), activation='relu', kernel_regularizer=l2(l2_conv1), kernel_initializer=initialize_weights_conv, bias_initializer=initialize_bias, input_shape=input_shape))
         model.add(KL.MaxPool2D())
         
-        model.add(KL.Conv2D(128, (7, 7), activation='relu', kernel_regularizer=l2(model_params['l2_conv2']), kernel_initializer=initialize_weights_conv, bias_initializer=initialize_bias))
+        model.add(KL.Conv2D(n_filters_conv2, (filter_size_conv2, filter_size_conv2), activation='relu', kernel_regularizer=l2(l2_conv2), kernel_initializer=initialize_weights_conv, bias_initializer=initialize_bias))
         model.add(KL.MaxPool2D())
         
-        model.add(KL.Conv2D(128, (4, 4), activation='relu', kernel_regularizer=l2(model_params['l2_conv3']), kernel_initializer=initialize_weights_conv, bias_initializer=initialize_bias))
+        model.add(KL.Conv2D(n_filters_conv3, (filter_size_conv3, filter_size_conv3), activation='relu', kernel_regularizer=l2(l2_conv3), kernel_initializer=initialize_weights_conv, bias_initializer=initialize_bias))
         model.add(KL.MaxPool2D())
         
-        model.add(KL.Conv2D(256, (4,4), activation='relu', kernel_regularizer=l2(model_params['l2_conv4']), kernel_initializer=initialize_weights_conv, bias_initializer=initialize_bias))
+        model.add(KL.Conv2D(n_filters_conv4, (filter_size_conv4,filter_size_conv4), activation='relu', kernel_regularizer=l2(l2_conv4), kernel_initializer=initialize_weights_conv, bias_initializer=initialize_bias))
         
         model.add(KL.Flatten())
-        model.add(KL.Dense(model_params['dense_size'], activation='sigmoid', kernel_regularizer=l2(model_params['l2_dense']), kernel_initializer=initialize_weights_dense, bias_initializer=initialize_bias))
+        model.add(KL.Dense(dense_size, activation='sigmoid', kernel_regularizer=l2(l2_dense), kernel_initializer=initialize_weights_dense, bias_initializer=initialize_bias))
         
         hidden_first = model(first_input)
         hidden_second = model(second_input)
@@ -182,7 +183,7 @@ class Siamese:
         similarity = KL.Dense(1, activation='sigmoid', bias_initializer=initialize_bias)(L1_distance)
         
         final_network = keras.Model(inputs=[first_input, second_input], outputs=similarity)
-        optimizer = keras.optimizers.SGD(lr=model_params['learning_rate'], momentum=model_params['momentum'], decay=model_params['decay'])
+        optimizer = keras.optimizers.SGD(lr=learning_rate, momentum=momentum, decay=decay)
         final_network.compile(loss=self.loss, optimizer=optimizer, metrics=self.metrics)
 
         self.model = final_network
