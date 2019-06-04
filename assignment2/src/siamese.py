@@ -59,7 +59,7 @@ class Siamese:
               batch_size=32, 
               epochs=40, 
               epoch_shuffle=False, 
-              earlystop_patience=10
+              earlystop_patience=10,
               verbose=2):
         
         if self.model_type == 'vggface':
@@ -82,9 +82,36 @@ class Siamese:
         X,y = list(generator)
         return self.model.predict(X), y
     
+    def evaluate(self, ):
+        fig, axes = plt.subplots(1, 2)
+        fig.set_figheight(7)
+        fig.set_figwidth(14)
+
+        # plot accuracy 
+        axes[0].plot(train_history.history['acc'])
+        axes[0].plot(train_history.history['val_acc'])
+        axes[0].set_title('model accuracy during training')
+        axes[0].set_ylabel('accuracy')
+        axes[0].set_xlabel('epoch')
+        axes[0].legend(['training', 'validation'], loc='best')
+
+        # plot loss
+        axes[1].plot(train_history.history['loss'])
+        axes[1].plot(train_history.history['val_loss'])
+        axes[1].set_title('model loss during training')
+        axes[1].set_ylabel('loss')
+        axes[1].set_xlabel('epoch')
+        axes[1].legend(['training', 'validation'], loc='best')
+
+
+        print()
+        test_loss, test_accuracy = self.test(same_test_paths, diff_test_paths)
+        print(f'Final test loss: {test_loss:.3}')
+        print(f'Final test accuracy: {test_accuracy:.3}')
+    
     def test(self, same_test_paths, diff_test_paths, epoch_shuffle=False):
         if self.model_type == 'vggface':
-            test_generator = LFWDataLoaderVGG(same_test_paths, diff_test_paths, shuffle=epoch_shuffle)
+            test_generator = LFWDataLoader(same_test_paths, diff_test_paths, shuffle=epoch_shuffle, channels=3, load_image_func=lfw._load_image)
         else:
             test_generator = LFWDataLoader(same_test_paths, diff_test_paths, shuffle=epoch_shuffle)
         loss, accuracy = self.model.evaluate_generator(test_generator, verbose=1)
@@ -118,7 +145,9 @@ class Siamese:
                 'l2_conv4': 1e-2,
                 'l2_dense': 1e-4,
                 'learning_rate': 1e-3,
+                'dense_size': 4096,
                 'momentum': 0.5,
+                'filter_size_conv1': 10,
                 'decay': 0.01
             }
         
@@ -131,7 +160,7 @@ class Siamese:
         initialize_weights_dense = keras.initializers.RandomNormal(mean=0.0, stddev=0.2, seed=84)  # filters initialize
         initialize_bias = keras.initializers.RandomNormal(mean=0.5, stddev=0.01, seed=84)  # bias initialize
         
-        model.add(KL.Conv2D(64, (10, 10), activation='relu', kernel_regularizer=l2(model_params['l2_conv1']), kernel_initializer=initialize_weights_conv, bias_initializer=initialize_bias, input_shape=input_shape))
+        model.add(KL.Conv2D(64, (model_params['filter_size_conv1'], model_params['filter_size_conv1']), activation='relu', kernel_regularizer=l2(model_params['l2_conv1']), kernel_initializer=initialize_weights_conv, bias_initializer=initialize_bias, input_shape=input_shape))
         model.add(KL.MaxPool2D())
         
         model.add(KL.Conv2D(128, (7, 7), activation='relu', kernel_regularizer=l2(model_params['l2_conv2']), kernel_initializer=initialize_weights_conv, bias_initializer=initialize_bias))
@@ -143,7 +172,7 @@ class Siamese:
         model.add(KL.Conv2D(256, (4,4), activation='relu', kernel_regularizer=l2(model_params['l2_conv4']), kernel_initializer=initialize_weights_conv, bias_initializer=initialize_bias))
         
         model.add(KL.Flatten())
-        model.add(KL.Dense(1024, activation='sigmoid', kernel_regularizer=l2(model_params['l2_dense']), kernel_initializer=initialize_weights_dense, bias_initializer=initialize_bias))
+        model.add(KL.Dense(model_params['dense_size'], activation='sigmoid', kernel_regularizer=l2(model_params['l2_dense']), kernel_initializer=initialize_weights_dense, bias_initializer=initialize_bias))
         
         hidden_first = model(first_input)
         hidden_second = model(second_input)
