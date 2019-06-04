@@ -139,7 +139,7 @@ class LFWDataLoader(keras.utils.Sequence):
             np.random.shuffle(self.indexes)
 
     def generate_batch(self, image_indexes):
-        X = np.empty((2, self.batch_size, *self.dim, 1), dtype=float)
+        X = np.empty((2, self.batch_size, *self.dim, self.channels), dtype=float)
         y = np.empty(self.batch_size, dtype=float)
 
         index = 0
