@@ -81,6 +81,7 @@ class Siamese:
         return self.model.predict(X), y
     
     def evaluate(self, train_history, same_test_paths, diff_test_paths):
+        import matplotlib.pyplot as plt
         fig, axes = plt.subplots(1, 2)
         fig.set_figheight(7)
         fig.set_figwidth(14)
