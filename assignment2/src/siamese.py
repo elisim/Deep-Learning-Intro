@@ -34,6 +34,7 @@ class Siamese:
         self.loss = loss
         self.batchnorm = batchnorm
         self.model_type = None
+        self.model = None
     
     def build(self, model='hani', **model_params):
         """
@@ -195,7 +196,7 @@ class Siamese:
         pass
     
     
-    def build_custom_network(self, **model_params):
+    def build_hani(self, **model_params):
         """
         Return a network defining the siamese network in:
         --------------------------------------------------------
@@ -205,42 +206,49 @@ class Siamese:
         doi:10.1109/HPCSim.2014.6903759
 
         """
-        act = model_params.get('act', 'relu')
-        tanh_A = 1.7159
-        tanh_B = 2/3
-        ## Todo: define act = A * tanh(Bx)
-               
+        def tanh_scaled(x):
+            A = 1.7159
+            B = 2/3
+            return A*K.tanh(B*x)
+        
+        act = model_params.get('act', tanh_scaled)
+        dropout = model_params.get('dropout', 0)
+        batchnorm = model_params.get('batchnorm', False)        
+        
         input_shape = (self.image_dim, self.image_dim, 1)
         first_input = KL.Input(input_shape)
         second_input = KL.Input(input_shape)
-
+        
         model = keras.Sequential()
         initialize_weights_conv = keras.initializers.RandomNormal(mean=0.0, stddev=0.01, seed=84)  # filters initialize
-        initialize_weights_dense = keras.initializers.RandomNormal(mean=0.0, stddev=0.2, seed=84)  # filters initialize
+        initialize_weights_dense = keras.initializers.RandomNormal(mean=0.0, stddev=0.2, seed=84)  # dense initialize
         initialize_bias = keras.initializers.RandomNormal(mean=0.5, stddev=0.01, seed=84)  # bias initialize
 
-        model.add(KL.Conv2D(5, (6, 6), strides=(2, 2), activation='relu', input_shape=input_shape,
-                         kernel_initializer=initialize_weights, kernel_regularizer=l2(1e-2)))
-        model = self._add_batchnorm(model)
+        model.add(KL.Conv2D(5, (6, 6), strides=(2, 2), activation=act, input_shape=input_shape,
+                         kernel_initializer=initialize_weights_conv, kernel_regularizer=l2(1e-2)))
+        if batchnorm:  
+            model.add(KL.BatchNormalization())
         model.add(KL.MaxPool2D())
 
-        model.add(KL.Conv2D(14, (6, 6), strides=(2, 2), activation='relu', kernel_initializer=initialize_weights,
+        model.add(KL.Conv2D(14, (6, 6), strides=(2, 2), activation=act, kernel_initializer=initialize_weights_conv,
                          bias_initializer=initialize_bias, kernel_regularizer=l2(1e-2)))
+        if batchnorm:  
+            model.add(KL.BatchNormalization())
+        model.add(KL.MaxPool2D())
         
-        model.add(KL.MaxPool2D())
-
-        model.add(KL.Conv2D(60, (6, 6), activation='relu', kernel_initializer=initialize_weights,
+        model.add(KL.Dropout(dropout))
+        model.add(KL.Conv2D(60, (6, 6), activation=act, kernel_initializer=initialize_weights_conv,
                          bias_initializer=initialize_bias, kernel_regularizer=l2(1e-2)))
-        model = self._add_batchnorm(model)
+        if batchnorm:  
+            model.add(KL.BatchNormalization())
         model.add(KL.MaxPool2D())
-
+        
         model.add(KL.Flatten())
 
-        model.add(KL.Dense(40, activation='relu', kernel_regularizer=l2(1e-4),
-                        kernel_initializer=initialize_weights, bias_initializer=initialize_bias))
-
+        model.add(KL.Dense(40, activation=act, kernel_regularizer=l2(1e-4),
+                        kernel_initializer=initialize_weights_dense, bias_initializer=initialize_bias))
         model.add(KL.Dense(40, activation=None, kernel_regularizer=l2(1e-4),
-                        kernel_initializer=initialize_weights, bias_initializer=initialize_bias))
+                        kernel_initializer=initialize_weights_dense, bias_initializer=initialize_bias))
 
         # Generate the encodings (feature vectors) for the two images
         encoded_l = model(first_input)
@@ -252,8 +260,8 @@ class Siamese:
         similarity = KL.Dense(1, activation='sigmoid', bias_initializer=initialize_bias)(L1_distance)
         
         final_network = keras.Model(inputs=[first_input, second_input], outputs=similarity)
-        optimizer = keras.optimizers.SGD(lr=self.lr, momentum=self.momentum, decay=self.decay)
-        #optimizer = keras.optimizers.Adam(lr=self.lr)
+        #optimizer = keras.optimizers.SGD(lr=self.lr, momentum=self.momentum, decay=self.decay)
+        optimizer = keras.optimizers.Adam(lr=self.lr)
         final_network.compile(loss=self.loss, optimizer=optimizer, metrics=self.metrics)
 
         self.model = final_network
@@ -313,11 +321,6 @@ class Siamese:
         
         self.model = final_network
         return final_network
-
-    def _add_batchnorm(self, model):
-        if self.batchnorm: 
-            model.add(KL.BatchNormalization())
-        return model
 
 
 def hyperas_build_custom_network(same_train_paths, diff_train_paths, same_val_paths, diff_val_paths, same_test_paths, diff_test_paths):
