@@ -132,12 +132,24 @@ class LFWDataLoader(keras.utils.Sequence):
         
         if use_worst_pairs:
             if model is None:
-                raise Exception("When using use_worst_paris=True you need to pass a model to use to check the samples during training")
+                raise Exception("When using use_worst_pairs=True you need to pass a model to use to check the samples during training")
             if ((batch_size - size_worst_pairs)% 2) != 0:
                 raise(Exception('(batch_size - size_worst_pairs) need to be dividable by 2'))
             
             self.worst_pairs_X = np.empty((2, size_worst_pairs, *self.dim, self.channels))
             self.worst_pairs_y = np.empty(size_worst_pairs, dtype=float)
+            self.batch_size = self.batch_size - self.size_worst_pairs
+            
+            self.X_pairs = np.empty((2, len(self.diff_paths)*2, *self.dim, self.channels))
+            self.y_pairs = np.empty(len(self.diff_paths)*2, dtype=float)
+            
+            for index in range(len(self.diff_paths)):
+                self.X_pairs[0, index] = self.load_image_func(self.same_paths[index][0])
+                self.X_pairs[1, index] = self.load_image_func(self.same_paths[index][1])    
+                self.X_pairs[0, index + len(self.diff_paths)] = self.load_image_func(self.diff_paths[index][0])
+                self.X_pairs[1, index + len(self.diff_paths)] = self.load_image_func(self.diff_paths[index][1])
+                self.y_pairs[index] = 1
+                self.y_pairs[index + len(self.diff_paths)] = 0
         else:
             if (batch_size % 2) != 0:
                 raise(Exception('batch_size need to be dividable by 2'))
@@ -153,28 +165,24 @@ class LFWDataLoader(keras.utils.Sequence):
             np.random.shuffle(self.indexes)
            
         if self.use_worst_pairs:
-            X_pred = np.empty((2, len(self.diff_paths)*2, *self.dim, self.channels))
-            y = np.empty(len(self.diff_paths)*2, dtype=float)
-            
-            for index in range(len(self.diff_paths)):
-                X_pred[0, index] = self.load_image_func(self.same_paths[index][0])
-                X_pred[1, index] = self.load_image_func(self.same_paths[index][1])    
-                X_pred[0, index + len(self.diff_paths)] = self.load_image_func(self.diff_paths[index][0])
-                X_pred[1, index + len(self.diff_paths)] = self.load_image_func(self.diff_paths[index][1])
-                y[index] = 1
-                y[index + len(self.diff_paths)] = 0
-            
-            y_pred = self.model.predict([X_pred[0], X_pred[1]])
-            ids_of_worst_pairs = np.argsort(np.abs(y - y_pred))[-self.size_worst_pairs:]
-            
+            y_pred = self.model.predict([self.X_pairs[0], self.X_pairs[1]])
+            ids_of_worst_pairs = np.argsort(np.abs(y_pred.T[0] - self.y_pairs))[-self.size_worst_pairs:]
+                        
             print(ids_of_worst_pairs)
-            print(y[ids_of_worst_pairs])
             print(y_pred[ids_of_worst_pairs])
+            for i in range(self.size_worst_pairs):
+                self.worst_pairs_X[0, i] = self.X_pairs[0, ids_of_worst_pairs[i]]
+                self.worst_pairs_X[1, i] = self.X_pairs[1, ids_of_worst_pairs[i]]
+                self.worst_pairs_y[i] = self.y_pairs[ids_of_worst_pairs[i]]
             
 
     def generate_batch(self, image_indexes):
-        X = np.empty((2, self.batch_size, *self.dim, self.channels), dtype=float)
-        y = np.empty(self.batch_size, dtype=float)
+        if self.use_worst_pairs:
+            X = np.empty((2, self.batch_size + self.size_worst_pairs, *self.dim, self.channels), dtype=float)
+            y = np.empty(self.batch_size + self.size_worst_pairs, dtype=float)
+        else:
+            X = np.empty((2, self.batch_size, *self.dim, self.channels), dtype=float)
+            y = np.empty(self.batch_size, dtype=float)
 
         index = 0
         for id in image_indexes:
@@ -188,6 +196,13 @@ class LFWDataLoader(keras.utils.Sequence):
             X[1, index] = self.load_image_func(self.diff_paths[id][1])
             y[index] = 0
             index += 1
+
+        if self.use_worst_pairs:
+            for i in range(self.size_worst_pairs):
+                X[0, index] = self.worst_pairs_X[0, i]
+                X[1, index] = self.worst_pairs_X[1, i]
+                y[index] = self.worst_pairs_y[i]
+                index += 1
 
         perm_test = np.random.permutation(y.shape[0])
         X[0, ] = X[0, perm_test, ]
