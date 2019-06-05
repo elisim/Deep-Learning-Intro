@@ -130,7 +130,8 @@ class Siamese:
                                       
         joblib.dump(best_run, 'best_run_transfer.jblib')
         joblib.dump(trials, 'transfer_all_trials_data.jblib')
-        
+ 
+
     def build_paper_network(self, **model_params):
         """
         :return: the network the mentioned in the original paper.
@@ -193,14 +194,22 @@ class Siamese:
     def build_custom_network_constrastive_loss(self):
         pass
     
+    
     def build_custom_network(self, **model_params):
+        """
+        Return a network defining the siamese network in:
+        --------------------------------------------------------
+        Khalil-Hani, M., & Sung, L. S. (2014). A convolutional neural
+        network approach for face verification. High Performance Computing
+        & Simulation (HPCS), 2014 International Conference on, (3), 707–714.
+        doi:10.1109/HPCSim.2014.6903759
+
+        """
         act = model_params.get('act', 'relu')
         tanh_A = 1.7159
         tanh_B = 2/3
         ## Todo: define act = A * tanh(Bx)
-        
-        
-        
+               
         input_shape = (self.image_dim, self.image_dim, 1)
         first_input = KL.Input(input_shape)
         second_input = KL.Input(input_shape)
