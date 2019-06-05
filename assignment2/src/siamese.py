@@ -1,18 +1,15 @@
+import src.lfw_dataset
+from src.lfw_dataset import LFWDataLoader, _load_image_vgg
 import tensorflow as tf
 from keras.regularizers import l2
-import lfw_dataset
-from lfw_dataset import LFWDataLoader, LFWDataLoaderVGG
 from sklearn.metrics import roc_auc_score, roc_curve
-
 from sklearn.externals import joblib
-
 import keras
 
 from hyperas.distributions import choice, uniform
 from hyperopt import Trials, STATUS_OK, tpe
 from hyperas import optim
 
-#keras = tf.keras
 K = keras.backend
 KL = keras.layers
 
@@ -23,7 +20,6 @@ session = tf.Session(config=config)
 
 
 class Siamese:
-    ### TODO: Class models that contain all the "build models"
     def __init__(self, lr=1e-4, 
                        momentum=0.9, 
                        decay=0.01,
@@ -37,8 +33,9 @@ class Siamese:
         self.metrics = metrics
         self.loss = loss
         self.batchnorm = batchnorm
+        self.model_type = None
     
-    def build(self, model='hani', model_params=None):
+    def build(self, model='hani', **model_params):
         """
         :param model: model name
         :param model_params: model params
@@ -47,10 +44,77 @@ class Siamese:
         self.model_type = model
         model = getattr(self, 'build_' + model)
         if model_params:
-            network = model(model_params)
+            network = model(**model_params)
         else:
             network = model()
         return network
+    
+    def train(self, 
+              same_train_paths,       
+              diff_train_paths, 
+              same_val_paths, 
+              diff_val_paths, 
+              batch_size=32, 
+              epochs=40, 
+              epoch_shuffle=False, 
+              earlystop_patience=10,
+              verbose=2):
+        
+        if self.model_type == 'vggface':
+            training_generator = LFWDataLoader(same_train_paths, diff_train_paths, shuffle=epoch_shuffle, batch_size=batch_size, channels=3, load_image_func=_load_image_vgg, dim=(224,224))
+            validation_generator = LFWDataLoader(same_val_paths, diff_val_paths, shuffle=epoch_shuffle, batch_size=batch_size, channels=3, load_image_func=_load_image_vgg, dim=(224,224))            
+        else:
+            training_generator = LFWDataLoader(same_train_paths, diff_train_paths, shuffle=epoch_shuffle, batch_size=batch_size)
+            validation_generator = LFWDataLoader(same_val_paths, diff_val_paths, shuffle=epoch_shuffle, batch_size=batch_size)
+    
+        history = self.model.fit_generator(generator=training_generator,
+                    validation_data=validation_generator,
+                    use_multiprocessing=False, verbose=verbose, epochs=epochs,
+                    callbacks=[keras.callbacks.EarlyStopping(patience=10, verbose=1)])
+        
+        return history  
+
+    def predict(self, same_paths, diff_paths):
+        ##### TODO do flatten on gen
+        generator = LFWDataLoader(same_test_paths, diff_test_paths, batch_size=len(same_paths)*2, shuffle=False)
+        X,y = list(generator)
+        return self.model.predict(X), y
+    
+    def evaluate(self, train_history, same_test_paths, diff_test_paths):
+        import matplotlib.pyplot as plt
+        fig, axes = plt.subplots(1, 2)
+        fig.set_figheight(7)
+        fig.set_figwidth(14)
+
+        # plot accuracy 
+        axes[0].plot(train_history.history['acc'])
+        axes[0].plot(train_history.history['val_acc'])
+        axes[0].set_title('model accuracy during training')
+        axes[0].set_ylabel('accuracy')
+        axes[0].set_xlabel('epoch')
+        axes[0].legend(['training', 'validation'], loc='best')
+
+        # plot loss
+        axes[1].plot(train_history.history['loss'])
+        axes[1].plot(train_history.history['val_loss'])
+        axes[1].set_title('model loss during training')
+        axes[1].set_ylabel('loss')
+        axes[1].set_xlabel('epoch')
+        axes[1].legend(['training', 'validation'], loc='best')
+
+
+        print()
+        test_loss, test_accuracy = self.test(same_test_paths, diff_test_paths)
+        print(f'Final test loss: {test_loss:.3}')
+        print(f'Final test accuracy: {test_accuracy:.3}')
+    
+    def test(self, same_test_paths, diff_test_paths, epoch_shuffle=False):
+        if self.model_type == 'vggface':
+            test_generator = LFWDataLoader(same_test_paths, diff_test_paths, shuffle=epoch_shuffle, channels=3, load_image_func=lfw._load_image, dim=(224,224))
+        else:
+            test_generator = LFWDataLoader(same_test_paths, diff_test_paths, shuffle=epoch_shuffle)
+        loss, accuracy = self.model.evaluate_generator(test_generator, verbose=1)
+        return loss, accuracy
     
     def run_hyperas_experiment(self):
         """
@@ -66,32 +130,52 @@ class Siamese:
                                       
         joblib.dump(best_run, 'best_run_transfer.jblib')
         joblib.dump(trials, 'transfer_all_trials_data.jblib')
-        
-    def build_paper_network(self):
+ 
+
+    def build_paper_network(self, **model_params):
         """
         :return: the network the mentioned in the original paper.
         """
+        filter_size_conv1 = model_params.get('filter_size_conv1', 10)
+        filter_size_conv2 = model_params.get('filter_size_conv2', 7)
+        filter_size_conv3 = model_params.get('filter_size_conv3', 4)
+        filter_size_conv4 = model_params.get('filter_size_conv4', 4)
+        n_filters_conv1 = model_params.get('n_filters_conv1', 64)
+        n_filters_conv2 = model_params.get('n_filters_conv2', 128)
+        n_filters_conv3 = model_params.get('n_filters_conv3', 128)
+        n_filters_conv4 = model_params.get('n_filters_conv4', 256)
+        l2_conv1 = model_params.get('l2_conv1', 1e-2)
+        l2_conv2 = model_params.get('l2_conv2', 1e-2)
+        l2_conv3 = model_params.get('l2_conv3', 1e-2)
+        l2_conv4 = model_params.get('l2_conv4', 1e-2)
+        l2_dense = model_params.get('l2_dense', 1e-4)
+        learning_rate = model_params.get('learning_rate', 1e-3)
+        dense_size = model_params.get('dense_size', 4096)
+        momentum = model_params.get('momentum',  0.5)
+        decay = model_params.get('decay',  0.01)
+        
         input_shape = (self.image_dim, self.image_dim, 1)
         first_input = KL.Input(input_shape)
         second_input = KL.Input(input_shape)
         
         model = keras.Sequential()
-        initialize_weights = keras.initializers.RandomNormal(mean=0.0, stddev=0.05, seed=84)  # filters initialize
+        initialize_weights_conv = keras.initializers.RandomNormal(mean=0.0, stddev=0.01, seed=84)  # filters initialize
+        initialize_weights_dense = keras.initializers.RandomNormal(mean=0.0, stddev=0.2, seed=84)  # dense initialize
         initialize_bias = keras.initializers.RandomNormal(mean=0.5, stddev=0.01, seed=84)  # bias initialize
         
-        model.add(KL.Conv2D(64, (10, 10), activation='relu', input_shape=input_shape))
+        model.add(KL.Conv2D(n_filters_conv1, (filter_size_conv1, filter_size_conv1), activation='relu', kernel_regularizer=l2(l2_conv1), kernel_initializer=initialize_weights_conv, bias_initializer=initialize_bias, input_shape=input_shape))
         model.add(KL.MaxPool2D())
         
-        model.add(KL.Conv2D(128, (7, 7), activation='relu'))
+        model.add(KL.Conv2D(n_filters_conv2, (filter_size_conv2, filter_size_conv2), activation='relu', kernel_regularizer=l2(l2_conv2), kernel_initializer=initialize_weights_conv, bias_initializer=initialize_bias))
         model.add(KL.MaxPool2D())
         
-        model.add(KL.Conv2D(128, (4, 4), activation='relu'))
+        model.add(KL.Conv2D(n_filters_conv3, (filter_size_conv3, filter_size_conv3), activation='relu', kernel_regularizer=l2(l2_conv3), kernel_initializer=initialize_weights_conv, bias_initializer=initialize_bias))
         model.add(KL.MaxPool2D())
         
-        model.add(KL.Conv2D(256, (4,4), activation='relu'))
+        model.add(KL.Conv2D(n_filters_conv4, (filter_size_conv4,filter_size_conv4), activation='relu', kernel_regularizer=l2(l2_conv4), kernel_initializer=initialize_weights_conv, bias_initializer=initialize_bias))
         
         model.add(KL.Flatten())
-        model.add(KL.Dense(512, activation='sigmoid'))
+        model.add(KL.Dense(dense_size, activation='sigmoid', kernel_regularizer=l2(l2_dense), kernel_initializer=initialize_weights_dense, bias_initializer=initialize_bias))
         
         hidden_first = model(first_input)
         hidden_second = model(second_input)
@@ -101,7 +185,7 @@ class Siamese:
         similarity = KL.Dense(1, activation='sigmoid', bias_initializer=initialize_bias)(L1_distance)
         
         final_network = keras.Model(inputs=[first_input, second_input], outputs=similarity)
-        optimizer = keras.optimizers.SGD(lr=self.lr, momentum=self.momentum, decay=self.decay)
+        optimizer = keras.optimizers.SGD(lr=learning_rate, momentum=momentum, decay=decay)
         final_network.compile(loss=self.loss, optimizer=optimizer, metrics=self.metrics)
 
         self.model = final_network
@@ -110,13 +194,29 @@ class Siamese:
     def build_custom_network_constrastive_loss(self):
         pass
     
-    def build_custom_network(self):
+    
+    def build_custom_network(self, **model_params):
+        """
+        Return a network defining the siamese network in:
+        --------------------------------------------------------
+        Khalil-Hani, M., & Sung, L. S. (2014). A convolutional neural
+        network approach for face verification. High Performance Computing
+        & Simulation (HPCS), 2014 International Conference on, (3), 707–714.
+        doi:10.1109/HPCSim.2014.6903759
+
+        """
+        act = model_params.get('act', 'relu')
+        tanh_A = 1.7159
+        tanh_B = 2/3
+        ## Todo: define act = A * tanh(Bx)
+               
         input_shape = (self.image_dim, self.image_dim, 1)
         first_input = KL.Input(input_shape)
         second_input = KL.Input(input_shape)
 
         model = keras.Sequential()
-        initialize_weights = keras.initializers.RandomNormal(mean=0.0, stddev=0.05, seed=84)  # filters initialize
+        initialize_weights_conv = keras.initializers.RandomNormal(mean=0.0, stddev=0.01, seed=84)  # filters initialize
+        initialize_weights_dense = keras.initializers.RandomNormal(mean=0.0, stddev=0.2, seed=84)  # filters initialize
         initialize_bias = keras.initializers.RandomNormal(mean=0.5, stddev=0.01, seed=84)  # bias initialize
 
         model.add(KL.Conv2D(5, (6, 6), strides=(2, 2), activation='relu', input_shape=input_shape,
@@ -159,8 +259,17 @@ class Siamese:
         self.model = final_network
         return final_network
     
-    def build_vggface(self):
-        from keras_vggface.vggface import VGGFace
+    def build_vggface(self, model_params=None):
+        from keras_vggface.vggface import VGG16, RESNET50, SENET50
+    
+        if model_params is None:
+            model_params = {
+                'dense_size': 512,
+                'learning_rate': 1e-3,
+                'momentum': 0.5,
+                'decay': 0.01,
+                'pre_trained_model': 'vgg16'
+            }
     
         initialize_weights = keras.initializers.RandomNormal(mean=0.0, stddev=0.05, seed=84)  # filters initialize
         initialize_bias = keras.initializers.RandomNormal(mean=0.5, stddev=0.01, seed=84)  # bias initialize
@@ -169,18 +278,27 @@ class Siamese:
         first_input = KL.Input(input_shape)
         second_input = KL.Input(input_shape)
         
-        vggface = VGGFace(model='vgg16')
-        vggface.layers.pop()
+        # remove the classifier layers and freeze the other layers
+        if model_params['pre_trained_model'] == 'vgg16':
+            vggface = VGG16()
+            for i in range(6):
+                vggface.layers.pop()
+        elif model_params['pre_trained_model'] == 'resnet50':
+            vggface = RESNET50()
+            vggface.layers.pop()            
+        elif model_params['pre_trained_model'] == 'senet50':
+            vggface = SENET50()
+            vggface.layers.pop()              
+        else:
+            raise Exception('Pretrained {} not familiar'.format(model_params['pre_trained_model']))
+        
         for layer in vggface.layers:
             layer.trainable = False
-        
+            
         new_model = keras.Sequential()
         new_model.add(vggface)
-        new_model.add(KL.Dense(512, activation='relu', kernel_initializer=initialize_weights, bias_initializer=initialize_bias))
+        new_model.add(KL.Dense(model_params['dense_size'], activation='sigmoid', kernel_initializer=initialize_weights, bias_initializer=initialize_bias))
         new_model.add(KL.Dropout(0.2))
-        new_model.add(KL.Dense(512, activation='relu', kernel_initializer=initialize_weights, bias_initializer=initialize_bias))
-        new_model.add(KL.Dropout(0.2))
-        new_model.add(KL.Dense(512, activation='sigmoid', kernel_initializer=initialize_weights, bias_initializer=initialize_bias))
         
         first_hidden = new_model(first_input)
         second_hidden = new_model(second_input)
@@ -188,10 +306,9 @@ class Siamese:
         L1_layer = KL.Lambda(lambda tensors: K.abs(tensors[0] - tensors[1]))
         L1_distance = L1_layer([first_hidden, second_hidden])
         similarity = KL.Dense(1, activation='sigmoid', kernel_initializer=initialize_weights, bias_initializer=initialize_bias)(L1_distance)
-
+        
         final_network = keras.Model(inputs=[first_input, second_input], outputs=similarity)
-        #optimizer = keras.optimizers.SGD(lr=self.lr, momentum=self.momentum, decay=self.decay)
-        optimizer = keras.optimizers.Adam(lr=self.lr)
+        optimizer = keras.optimizers.Adam(lr=model_params['learning_rate'])
         final_network.compile(loss="binary_crossentropy", optimizer=optimizer, metrics=self.metrics)
         
         self.model = final_network
@@ -201,43 +318,6 @@ class Siamese:
         if self.batchnorm: 
             model.add(KL.BatchNormalization())
         return model
-
-    def train(self, 
-              same_train_paths,       
-              diff_train_paths, 
-              same_val_paths, 
-              diff_val_paths, 
-              batch_size=32, 
-              epochs=40, 
-              epoch_shuffle=False):
-        
-        if self.model_type == 'vggface':
-            training_generator = LFWDataLoaderVGG(same_train_paths, diff_train_paths, shuffle=epoch_shuffle, batch_size=batch_size)
-            validation_generator = LFWDataLoaderVGG(same_val_paths, diff_val_paths, shuffle=epoch_shuffle, batch_size=batch_size)            
-        else:
-            training_generator = LFWDataLoader(same_train_paths, diff_train_paths, shuffle=epoch_shuffle, batch_size=batch_size)
-            validation_generator = LFWDataLoader(same_val_paths, diff_val_paths, shuffle=epoch_shuffle, batch_size=batch_size)
-    
-        history = self.model.fit_generator(generator=training_generator,
-                    validation_data=validation_generator,
-                    use_multiprocessing=False, verbose=1, epochs=epochs)
-        
-        return history
-    
-    def predict(self, same_paths, diff_paths):
-        ##### TODO do flatten on gen
-        generator = LFWDataLoader(same_test_paths, diff_test_paths, batch_size=len(same_paths)*2, shuffle=False)
-        X,y = list(generator)
-        return self.model.predict(X), y
-    
-    def test(self, same_test_paths, diff_test_paths, epoch_shuffle=False):
-        if self.model_type == 'vggface':
-            test_generator = LFWDataLoaderVGG(same_test_paths, diff_test_paths, shuffle=epoch_shuffle)
-        else:
-            test_generator = LFWDataLoader(same_test_paths, diff_test_paths, shuffle=epoch_shuffle)
-        loss, accuracy = self.model.evaluate_generator(test_generator, verbose=1)
-        return loss, accuracy
-
 
 
 def hyperas_build_custom_network(same_train_paths, diff_train_paths, same_val_paths, diff_val_paths, same_test_paths, diff_test_paths):
