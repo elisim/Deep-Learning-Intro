@@ -116,12 +116,8 @@ def perpare_triplets():
     
 
 class LFWDataLoader(keras.utils.Sequence):
-    def __init__(self, same_paths, diff_paths, batch_size=32, dim=(IMAGES_DIM, IMAGES_DIM), channels=1, load_image_func=_load_image, shuffle=False):
-        if batch_size % 2 != 0:
-            raise(Exception('batch size need to be dividable by 2'))
-        if len(same_paths) != len(diff_paths):
-            raise(Exception('we should have the same amount of paths for similar images and different images'))
-
+    def __init__(self, same_paths, diff_paths, batch_size=32, dim=(IMAGES_DIM, IMAGES_DIM), channels=1, load_image_func=_load_image, shuffle=False, use_worst_pairs=False, size_worst_pairs=12, model=None):
+        
         self.dim = dim
         self.channels = channels
         self.load_image_func = load_image_func
@@ -129,14 +125,52 @@ class LFWDataLoader(keras.utils.Sequence):
         self.diff_paths = diff_paths
         self.batch_size = batch_size
         self.shuffle = shuffle
+        self.use_worst_pairs = use_worst_pairs
+        self.size_worst_pairs = size_worst_pairs
+        self.model = model
         self.indexes = np.arange(len(self.same_paths))
+        
+        if use_worst_pairs:
+            if model is None:
+                raise Exception("When using use_worst_paris=True you need to pass a model to use to check the samples during training")
+            if ((batch_size - size_worst_pairs)% 2) != 0:
+                raise(Exception('(batch_size - size_worst_pairs) need to be dividable by 2'))
+            
+            self.worst_pairs_X = np.empty((2, size_worst_pairs, *self.dim, self.channels))
+            self.worst_pairs_y = np.empty(size_worst_pairs, dtype=float)
+        else:
+            if (batch_size % 2) != 0:
+                raise(Exception('batch_size need to be dividable by 2'))
+        if len(same_paths) != len(diff_paths):
+            raise(Exception('we should have the same amount of paths for similar images and different images'))
 
-        self.on_end_of_epoch()
 
-    def on_end_of_epoch(self):
+        self.on_epoch_end()
+
+    def on_epoch_end(self):
         self.indexes = np.arange(len(self.same_paths))
         if self.shuffle == True:
             np.random.shuffle(self.indexes)
+           
+        if self.use_worst_pairs:
+            X_pred = np.empty((2, len(self.diff_paths)*2, *self.dim, self.channels))
+            y = np.empty(len(self.diff_paths)*2, dtype=float)
+            
+            for index in range(len(self.diff_paths)):
+                X_pred[0, index] = self.load_image_func(self.same_paths[index][0])
+                X_pred[1, index] = self.load_image_func(self.same_paths[index][1])    
+                X_pred[0, index + len(self.diff_paths)] = self.load_image_func(self.diff_paths[index][0])
+                X_pred[1, index + len(self.diff_paths)] = self.load_image_func(self.diff_paths[index][1])
+                y[index] = 1
+                y[index + len(self.diff_paths)] = 0
+            
+            y_pred = self.model.predict([X_pred[0], X_pred[1]])
+            ids_of_worst_pairs = np.argsort(np.abs(y - y_pred))[-self.size_worst_pairs:]
+            
+            print(ids_of_worst_pairs)
+            print(y[ids_of_worst_pairs])
+            print(y_pred[ids_of_worst_pairs])
+            
 
     def generate_batch(self, image_indexes):
         X = np.empty((2, self.batch_size, *self.dim, self.channels), dtype=float)

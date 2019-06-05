@@ -58,14 +58,17 @@ class Siamese:
               epochs=40, 
               epoch_shuffle=False, 
               earlystop_patience=10,
-              verbose=2):
+              verbose=2,
+              use_worst_pairs=False, 
+              size_worst_pairs=12, 
+              model=None):
         
         if self.model_type == 'vggface':
-            training_generator = LFWDataLoader(same_train_paths, diff_train_paths, shuffle=epoch_shuffle, batch_size=batch_size, channels=3, load_image_func=_load_image_vgg, dim=(224,224))
-            validation_generator = LFWDataLoader(same_val_paths, diff_val_paths, shuffle=epoch_shuffle, batch_size=batch_size, channels=3, load_image_func=_load_image_vgg, dim=(224,224))            
+            training_generator = LFWDataLoader(same_train_paths, diff_train_paths, shuffle=epoch_shuffle, batch_size=batch_size, channels=3, load_image_func=_load_image_vgg, dim=(224,224), use_worst_pairs=use_worst_pairs, size_worst_pairs=size_worst_pairs, model=model)
+            validation_generator = LFWDataLoader(same_val_paths, diff_val_paths, shuffle=epoch_shuffle, batch_size=batch_size, channels=3, load_image_func=_load_image_vgg, dim=(224,224), use_worst_pairs=use_worst_pairs, size_worst_pairs=size_worst_pairs, model=model)            
         else:
-            training_generator = LFWDataLoader(same_train_paths, diff_train_paths, shuffle=epoch_shuffle, batch_size=batch_size)
-            validation_generator = LFWDataLoader(same_val_paths, diff_val_paths, shuffle=epoch_shuffle, batch_size=batch_size)
+            training_generator = LFWDataLoader(same_train_paths, diff_train_paths, shuffle=epoch_shuffle, batch_size=batch_size, use_worst_pairs=use_worst_pairs, size_worst_pairs=size_worst_pairs, model=model)
+            validation_generator = LFWDataLoader(same_val_paths, diff_val_paths, shuffle=epoch_shuffle, batch_size=batch_size,  use_worst_pairs=use_worst_pairs, size_worst_pairs=size_worst_pairs, model=model)
     
         history = self.model.fit_generator(generator=training_generator,
                     validation_data=validation_generator,
@@ -130,8 +133,7 @@ class Siamese:
                                       
         joblib.dump(best_run, 'best_run_transfer.jblib')
         joblib.dump(trials, 'transfer_all_trials_data.jblib')
- 
-
+        
     def build_paper_network(self, **model_params):
         """
         :return: the network the mentioned in the original paper.
@@ -194,7 +196,6 @@ class Siamese:
     def build_custom_network_constrastive_loss(self):
         pass
     
-    
     def build_custom_network(self, **model_params):
         """
         Return a network defining the siamese network in:
@@ -203,20 +204,21 @@ class Siamese:
         network approach for face verification. High Performance Computing
         & Simulation (HPCS), 2014 International Conference on, (3), 707–714.
         doi:10.1109/HPCSim.2014.6903759
-
         """
+
         act = model_params.get('act', 'relu')
         tanh_A = 1.7159
         tanh_B = 2/3
         ## Todo: define act = A * tanh(Bx)
-               
+        
+        
+        
         input_shape = (self.image_dim, self.image_dim, 1)
         first_input = KL.Input(input_shape)
         second_input = KL.Input(input_shape)
 
         model = keras.Sequential()
-        initialize_weights_conv = keras.initializers.RandomNormal(mean=0.0, stddev=0.01, seed=84)  # filters initialize
-        initialize_weights_dense = keras.initializers.RandomNormal(mean=0.0, stddev=0.2, seed=84)  # filters initialize
+        initialize_weights = keras.initializers.RandomNormal(mean=0.0, stddev=0.01, seed=84)  # filters initialize
         initialize_bias = keras.initializers.RandomNormal(mean=0.5, stddev=0.01, seed=84)  # bias initialize
 
         model.add(KL.Conv2D(5, (6, 6), strides=(2, 2), activation='relu', input_shape=input_shape,
