@@ -65,10 +65,10 @@ class Siamese:
         
         if self.model_type == 'vggface':
             training_generator = LFWDataLoader(same_train_paths, diff_train_paths, shuffle=epoch_shuffle, batch_size=batch_size, channels=3, load_image_func=_load_image_vgg, dim=(224,224), use_worst_pairs=use_worst_pairs, size_worst_pairs=size_worst_pairs, model=model)
-            validation_generator = LFWDataLoader(same_val_paths, diff_val_paths, shuffle=epoch_shuffle, batch_size=batch_size, channels=3, load_image_func=_load_image_vgg, dim=(224,224), use_worst_pairs=use_worst_pairs, size_worst_pairs=size_worst_pairs, model=model)            
+            validation_generator = LFWDataLoader(same_val_paths, diff_val_paths, shuffle=epoch_shuffle, batch_size=batch_size, channels=3, load_image_func=_load_image_vgg, dim=(224,224))            
         else:
             training_generator = LFWDataLoader(same_train_paths, diff_train_paths, shuffle=epoch_shuffle, batch_size=batch_size, use_worst_pairs=use_worst_pairs, size_worst_pairs=size_worst_pairs, model=model)
-            validation_generator = LFWDataLoader(same_val_paths, diff_val_paths, shuffle=epoch_shuffle, batch_size=batch_size,  use_worst_pairs=use_worst_pairs, size_worst_pairs=size_worst_pairs, model=model)
+            validation_generator = LFWDataLoader(same_val_paths, diff_val_paths)
     
         history = self.model.fit_generator(generator=training_generator,
                     validation_data=validation_generator,
