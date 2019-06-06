@@ -108,7 +108,12 @@ def _load_image_vgg(path):
     backtorgb = cv2.cvtColor(gray_image,cv2.COLOR_GRAY2RGB)
     # rezise the image to fit the VGG16 model shape
     resized_image = cv2.resize(backtorgb, dsize=(VGG_IMAGES_DIM, VGG_IMAGES_DIM), interpolation=cv2.INTER_CUBIC)
-    return resized_image.reshape(1,224,224,3)
+    reshaped_image = resized_image.reshape(1,224,224,3)
+    # taken from the keras_vggface repository
+    reshaped_image[:,:,:,0] -= 93.5940
+    reshaped_image[:,:,:,1] -= 104.7624
+    reshaped_image[:,:,:,2] -= 129.1863     
+    return reshaped_image
 
 
 def perpare_triplets():
