@@ -168,8 +168,6 @@ class LFWDataLoader(keras.utils.Sequence):
             y_pred = self.model.predict([self.X_pairs[0], self.X_pairs[1]])
             ids_of_worst_pairs = np.argsort(np.abs(y_pred.T[0] - self.y_pairs))[-self.size_worst_pairs:]
                         
-            print(ids_of_worst_pairs)
-            print(y_pred[ids_of_worst_pairs])
             for i in range(self.size_worst_pairs):
                 self.worst_pairs_X[0, i] = self.X_pairs[0, ids_of_worst_pairs[i]]
                 self.worst_pairs_X[1, i] = self.X_pairs[1, ids_of_worst_pairs[i]]

@@ -114,7 +114,7 @@ class Siamese:
     
     def test(self, same_test_paths, diff_test_paths, epoch_shuffle=False):
         if self.model_type == 'vggface':
-            test_generator = LFWDataLoader(same_test_paths, diff_test_paths, shuffle=epoch_shuffle, channels=3, load_image_func=lfw._load_image, dim=(224,224))
+            test_generator = LFWDataLoader(same_test_paths, diff_test_paths, shuffle=epoch_shuffle, channels=3, load_image_func=_load_image_vgg, dim=(224,224))
         else:
             test_generator = LFWDataLoader(same_test_paths, diff_test_paths, shuffle=epoch_shuffle)
         loss, accuracy = self.model.evaluate_generator(test_generator, verbose=1)
@@ -208,7 +208,7 @@ class Siamese:
         doi:10.1109/HPCSim.2014.6903759
         """
 
-        """
+    
         def tanh_scaled(x):
             A = 1.7159
             B = 2/3
@@ -270,17 +270,14 @@ class Siamese:
         self.model = final_network
         return final_network
     
-    def build_vggface(self, model_params=None):
+    def build_vggface(self, **model_params):
         from keras_vggface.vggface import VGG16, RESNET50, SENET50
     
-        if model_params is None:
-            model_params = {
-                'dense_size': 512,
-                'learning_rate': 1e-3,
-                'momentum': 0.5,
-                'decay': 0.01,
-                'pre_trained_model': 'vgg16'
-            }
+        dense_layer_size = model_params.get('dense_size', 512)
+        learning_rate = model_params.get('learning_rate', 1e-3)
+        momentum = model_params.get('momentum', 0.5)
+        decay = model_params.get('decay', 0.01)
+        pre_trained_model = model_params.get('pre_trained_model', 'vgg16')
     
         initialize_weights = keras.initializers.RandomNormal(mean=0.0, stddev=0.05, seed=84)  # filters initialize
         initialize_bias = keras.initializers.RandomNormal(mean=0.5, stddev=0.01, seed=84)  # bias initialize
@@ -290,14 +287,14 @@ class Siamese:
         second_input = KL.Input(input_shape)
         
         # remove the classifier layers and freeze the other layers
-        if model_params['pre_trained_model'] == 'vgg16':
+        if pre_trained_model == 'vgg16':
             vggface = VGG16()
             for i in range(6):
                 vggface.layers.pop()
-        elif model_params['pre_trained_model'] == 'resnet50':
+        elif pre_trained_model == 'resnet50':
             vggface = RESNET50()
             vggface.layers.pop()            
-        elif model_params['pre_trained_model'] == 'senet50':
+        elif pre_trained_model == 'senet50':
             vggface = SENET50()
             vggface.layers.pop()              
         else:
@@ -308,7 +305,7 @@ class Siamese:
             
         new_model = keras.Sequential()
         new_model.add(vggface)
-        new_model.add(KL.Dense(model_params['dense_size'], activation='sigmoid', kernel_initializer=initialize_weights, bias_initializer=initialize_bias))
+        new_model.add(KL.Dense(dense_layer_size, activation='sigmoid', kernel_initializer=initialize_weights, bias_initializer=initialize_bias))
         new_model.add(KL.Dropout(0.2))
         
         first_hidden = new_model(first_input)
@@ -319,7 +316,8 @@ class Siamese:
         similarity = KL.Dense(1, activation='sigmoid', kernel_initializer=initialize_weights, bias_initializer=initialize_bias)(L1_distance)
         
         final_network = keras.Model(inputs=[first_input, second_input], outputs=similarity)
-        optimizer = keras.optimizers.Adam(lr=model_params['learning_rate'])
+        #optimizer = keras.optimizers.Adam(lr=learning_rate)
+        optimizer = keras.optimizers.SGD(lr=learning_rate,decay=decay, momentum=momentum)
         final_network.compile(loss="binary_crossentropy", optimizer=optimizer, metrics=self.metrics)
         
         self.model = final_network
