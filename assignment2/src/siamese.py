@@ -187,13 +187,10 @@ class Siamese:
         
         final_network = keras.Model(inputs=[first_input, second_input], outputs=similarity)
         optimizer = keras.optimizers.SGD(lr=learning_rate, momentum=momentum, decay=decay)
-        final_network.compile(loss=self.loss, optimizer=optimizer, metrics=self.metrics)
+        final_network.compile(loss=loss, optimizer=optimizer, metrics=['accuracy'])
 
         self.model = final_network
         return final_network
-
-    def build_custom_network_constrastive_loss(self):
-        pass
     
     
     def build_hani(self, **model_params):
@@ -213,7 +210,8 @@ class Siamese:
         
         act = model_params.get('act', tanh_scaled)
         dropout = model_params.get('dropout', 0)
-        batchnorm = model_params.get('batchnorm', False)        
+        batchnorm = model_params.get('batchnorm', False)
+        loss = model_params.get('loss', contrastive_loss)
         
         input_shape = (self.image_dim, self.image_dim, 1)
         first_input = KL.Input(input_shape)
@@ -255,17 +253,17 @@ class Siamese:
         encoded_r = model(second_input)
 
         # calculate similarity
-        L1_layer = KL.Lambda(lambda tensors: K.abs(tensors[0] - tensors[1]))
-        L1_distance = L1_layer([encoded_l, encoded_r])
-        similarity = KL.Dense(1, activation='sigmoid', bias_initializer=initialize_bias)(L1_distance)
+        L2_distance = KL.Lambda(euclidean_distance)([encoded_l, encoded_r])
+        #similarity = KL.Dense(1, activation='sigmoid', bias_initializer=initialize_bias)(L1_distance)
         
-        final_network = keras.Model(inputs=[first_input, second_input], outputs=similarity)
+        final_network = keras.Model(inputs=[first_input, second_input], outputs=L2_distance)
         #optimizer = keras.optimizers.SGD(lr=self.lr, momentum=self.momentum, decay=self.decay)
         optimizer = keras.optimizers.Adam(lr=self.lr)
-        final_network.compile(loss=self.loss, optimizer=optimizer, metrics=self.metrics)
+        final_network.compile(loss=loss, optimizer=optimizer, metrics=['accuracy'])
 
         self.model = final_network
         return final_network
+    
     
     def build_vggface(self, model_params=None):
         from keras_vggface.vggface import VGG16, RESNET50, SENET50
@@ -323,6 +321,29 @@ class Siamese:
         return final_network
 
 
+def euclidean_distance(vects):
+    x, y = vects
+    sum_square = K.sum(K.square(x - y), axis=1, keepdims=True)
+    return K.sqrt(K.maximum(sum_square, K.epsilon()))
+
+
+def eucl_dist_output_shape(shapes):
+    shape1, shape2 = shapes
+    return (shape1[0], 1)
+
+
+def contrastive_loss(y_true, y_pred):
+    '''Contrastive loss from Hadsell-et-al.'06
+    http://yann.lecun.com/exdb/publis/pdf/hadsell-chopra-lecun-06.pdf
+    '''
+    y_true = 1-y_true
+    margin = 0.5
+    square_pred = K.square(y_pred)
+    margin_square = K.square(K.maximum(margin - y_pred, 0))
+    return K.mean(y_true * square_pred + (1 - y_true) * margin_square)
+
+
+    
 def hyperas_build_custom_network(same_train_paths, diff_train_paths, same_val_paths, diff_val_paths, same_test_paths, diff_test_paths):
     import keras
     K = keras.backend

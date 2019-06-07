@@ -2,7 +2,6 @@
 Labeled Faces in the Wild dataset of face photographs.
 """
 import pathlib
-import random
 from google_drive_downloader import GoogleDriveDownloader as gdd
 from os.path import join, isdir, exists
 from os import listdir, remove, path
@@ -10,12 +9,10 @@ from shutil import move
 import requests
 from imageio import imread
 import numpy as np
-from tensorflow.python.keras.utils.data_utils import Sequence
 import keras
-import cv2
 
 
-root='../data/lfw2'
+root = '../data/lfw2'
 train_info_url = 'http://vis-www.cs.umass.edu/lfw/pairsDevTrain.txt'
 test_info_url = 'http://vis-www.cs.umass.edu/lfw/pairsDevTest.txt'
 
@@ -102,6 +99,7 @@ def _load_image_vgg(path):
     """
     Load an image to be ready for the VGG16 model.
     """
+    import cv2
     # load the image from the disk
     gray_image = imread(path)
     # transform the grayscale image to RGB
