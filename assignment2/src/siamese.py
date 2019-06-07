@@ -273,11 +273,14 @@ class Siamese:
     def build_vggface(self, **model_params):
         from keras_vggface.vggface import VGG16, RESNET50, SENET50
     
-        dense_layer_size = model_params.get('dense_size', 512)
+        dense_layer_size_1 = model_params.get('dense_size_1', 1024)
+        dense_layer_size_2 = model_params.get('dense_size_2', 512)
         learning_rate = model_params.get('learning_rate', 1e-3)
         momentum = model_params.get('momentum', 0.5)
         decay = model_params.get('decay', 0.01)
         pre_trained_model = model_params.get('pre_trained_model', 'vgg16')
+        dropout_prob = model_params.get('dropout_prob', 0.2)
+        use_second_dense_layer = model_params.get('use_second_dense_layer', False)
     
         initialize_weights = keras.initializers.RandomNormal(mean=0.0, stddev=0.05, seed=84)  # filters initialize
         initialize_bias = keras.initializers.RandomNormal(mean=0.5, stddev=0.01, seed=84)  # bias initialize
@@ -305,8 +308,11 @@ class Siamese:
             
         new_model = keras.Sequential()
         new_model.add(vggface)
-        new_model.add(KL.Dense(dense_layer_size, activation='sigmoid', kernel_initializer=initialize_weights, bias_initializer=initialize_bias))
-        new_model.add(KL.Dropout(0.2))
+        new_model.add(KL.Dense(dense_layer_size_1, activation='sigmoid', kernel_initializer=initialize_weights, bias_initializer=initialize_bias))
+        new_model.add(KL.Dropout(dropout_prob))
+        if use_second_dense_layer:
+            new_model.add(KL.Dense(dense_layer_size_2, activation='sigmoid', kernel_initializer=initialize_weights, bias_initializer=initialize_bias))
+
         
         first_hidden = new_model(first_input)
         second_hidden = new_model(second_input)
