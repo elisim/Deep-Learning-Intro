@@ -120,7 +120,7 @@ def perpare_triplets():
     
 
 class LFWDataLoader(keras.utils.Sequence):
-    def __init__(self, same_paths, diff_paths, batch_size=32, dim=(IMAGES_DIM, IMAGES_DIM), channels=1, load_image_func=_load_image, shuffle=False, use_worst_pairs=False, size_worst_pairs=12, model=None):
+    def __init__(self, same_paths, diff_paths, batch_size=32, dim=(IMAGES_DIM, IMAGES_DIM), channels=1, load_image_func=_load_image, shuffle=False, use_allocated_pairs=True, use_worst_pairs=True, size_allocated_pairs=12, model=None):
         
         self.dim = dim
         self.channels = channels
@@ -131,18 +131,19 @@ class LFWDataLoader(keras.utils.Sequence):
         self.shuffle = shuffle
         self.use_worst_pairs = use_worst_pairs
         self.size_worst_pairs = size_worst_pairs
+        self.best_pairs = best_pairs
         self.model = model
         self.indexes = np.arange(len(self.same_paths))
         
-        if use_worst_pairs:
+        if use_allocated_pairs:
             if model is None:
                 raise Exception("When using use_worst_pairs=True you need to pass a model to use to check the samples during training")
-            if ((batch_size - size_worst_pairs)% 2) != 0:
+            if ((batch_size - size_allocated_pairs)% 2) != 0:
                 raise(Exception('(batch_size - size_worst_pairs) need to be dividable by 2'))
             
-            self.worst_pairs_X = np.empty((2, size_worst_pairs, *self.dim, self.channels))
-            self.worst_pairs_y = np.empty(size_worst_pairs, dtype=float)
-            self.batch_size = self.batch_size - self.size_worst_pairs
+            self.worst_pairs_X = np.empty((2, size_allocated_pairs, *self.dim, self.channels))
+            self.worst_pairs_y = np.empty(size_allocated_pairs, dtype=float)
+            self.batch_size = self.batch_size - self.size_allocated_pairs
             
             self.X_pairs = np.empty((2, len(self.diff_paths)*2, *self.dim, self.channels))
             self.y_pairs = np.empty(len(self.diff_paths)*2, dtype=float)
@@ -168,9 +169,12 @@ class LFWDataLoader(keras.utils.Sequence):
         if self.shuffle == True:
             np.random.shuffle(self.indexes)
            
-        if self.use_worst_pairs:
+        if self.use_allocated_pairs:
             y_pred = self.model.predict([self.X_pairs[0], self.X_pairs[1]])
-            ids_of_worst_pairs = np.argsort(np.abs(y_pred.T[0] - self.y_pairs))[:self.size_worst_pairs]
+            if self.use_worst_pairs:
+                ids_of_worst_pairs = np.argsort(np.abs(y_pred.T[0] - self.y_pairs))[-self.size_allocated_pairs:]
+            else:
+                ids_of_worst_pairs = np.argsort(np.abs(y_pred.T[0] - self.y_pairs))[:self.size_allocated_pairs]
                         
             for i in range(self.size_worst_pairs):
                 self.worst_pairs_X[0, i] = self.X_pairs[0, ids_of_worst_pairs[i]]
@@ -180,8 +184,8 @@ class LFWDataLoader(keras.utils.Sequence):
 
     def generate_batch(self, image_indexes):
         if self.use_worst_pairs:
-            X = np.empty((2, self.batch_size + self.size_worst_pairs, *self.dim, self.channels), dtype=float)
-            y = np.empty(self.batch_size + self.size_worst_pairs, dtype=float)
+            X = np.empty((2, self.batch_size + self.size_allocated_pairs, *self.dim, self.channels), dtype=float)
+            y = np.empty(self.batch_size + self.size_allocated_pairs, dtype=float)
         else:
             X = np.empty((2, self.batch_size, *self.dim, self.channels), dtype=float)
             y = np.empty(self.batch_size, dtype=float)
@@ -199,8 +203,8 @@ class LFWDataLoader(keras.utils.Sequence):
             y[index] = 1
             index += 1
 
-        if self.use_worst_pairs:
-            for i in range(self.size_worst_pairs):
+        if self.use_allocated_pairs:
+            for i in range(self.size_allocated_pairs):
                 X[0, index] = self.worst_pairs_X[0, i]
                 X[1, index] = self.worst_pairs_X[1, i]
                 y[index] = self.worst_pairs_y[i]
