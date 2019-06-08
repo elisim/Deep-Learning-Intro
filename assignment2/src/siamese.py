@@ -71,14 +71,14 @@ class Siamese:
             training_generator = LFWDataLoader(same_train_paths, diff_train_paths, shuffle=epoch_shuffle, batch_size=batch_size, use_worst_pairs=use_worst_pairs, size_worst_pairs=size_worst_pairs, model=model)
             validation_generator = LFWDataLoader(same_val_paths, diff_val_paths)
     
-        #history = self.model.fit_generator(generator=training_generator,
-        #            validation_data=validation_generator,
-        #            use_multiprocessing=False, verbose=verbose, epochs=epochs,
-        #            callbacks=[keras.callbacks.EarlyStopping(patience=10, verbose=1)])
-        
         history = self.model.fit_generator(generator=training_generator,
                     validation_data=validation_generator,
-                    use_multiprocessing=False, verbose=verbose, epochs=epochs)        
+                    use_multiprocessing=False, verbose=verbose, epochs=epochs,
+                    callbacks=[keras.callbacks.EarlyStopping(patience=10, verbose=1)])
+        
+        #history = self.model.fit_generator(generator=training_generator,
+        #            validation_data=validation_generator,
+        #            use_multiprocessing=False, verbose=verbose, epochs=epochs)        
         
         return history  
 
