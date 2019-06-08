@@ -1,6 +1,7 @@
 import src.models as models
 from src.lfw_dataset import LFWDataLoader, _load_image_vgg
 import tensorflow as tf
+import keras
 from keras.regularizers import l2
 from sklearn.externals import joblib
 from hyperas.distributions import choice, uniform
@@ -51,7 +52,7 @@ class Siamese:
             training_generator = LFWDataLoader(same_train_paths, diff_train_paths, shuffle=epoch_shuffle, batch_size=batch_size, channels=3, load_image_func=_load_image_vgg, dim=(224,224), use_worst_pairs=use_worst_pairs, size_worst_pairs=size_worst_pairs, model=model)
             validation_generator = LFWDataLoader(same_val_paths, diff_val_paths, shuffle=epoch_shuffle, batch_size=batch_size, channels=3, load_image_func=_load_image_vgg, dim=(224,224))            
         else:
-            training_generator = LFWDataLoader(same_train_paths, diff_train_paths, shuffle=epoch_shuffle, batch_size=batch_size, use_worst_pairs=use_worst_pairs, size_worst_pairs=size_worst_pairs, model=model)
+            training_generator = LFWDataLoader(same_train_paths, diff_train_paths, shuffle=epoch_shuffle, batch_size=batch_size, use_worst_pairs=use_worst_pairs, size_worst_pairs=size_worst_pairs, model=self.model)
             validation_generator = LFWDataLoader(same_val_paths, diff_val_paths)
     
         history = self.model.fit_generator(generator=training_generator,
