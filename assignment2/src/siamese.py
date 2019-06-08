@@ -71,10 +71,14 @@ class Siamese:
             training_generator = LFWDataLoader(same_train_paths, diff_train_paths, shuffle=epoch_shuffle, batch_size=batch_size, use_worst_pairs=use_worst_pairs, size_worst_pairs=size_worst_pairs, model=model)
             validation_generator = LFWDataLoader(same_val_paths, diff_val_paths)
     
+        #history = self.model.fit_generator(generator=training_generator,
+        #            validation_data=validation_generator,
+        #            use_multiprocessing=False, verbose=verbose, epochs=epochs,
+        #            callbacks=[keras.callbacks.EarlyStopping(patience=10, verbose=1)])
+        
         history = self.model.fit_generator(generator=training_generator,
                     validation_data=validation_generator,
-                    use_multiprocessing=False, verbose=verbose, epochs=epochs,
-                    callbacks=[keras.callbacks.EarlyStopping(patience=10, verbose=1)])
+                    use_multiprocessing=False, verbose=verbose, epochs=epochs)        
         
         return history  
 
@@ -226,6 +230,10 @@ class Siamese:
         initialize_weights_dense = keras.initializers.RandomNormal(mean=0.0, stddev=0.2, seed=84)  # dense initialize
         initialize_bias = keras.initializers.RandomNormal(mean=0.5, stddev=0.01, seed=84)  # bias initialize
 
+        
+        initialize_weights_conv = keras.initializers.glorot_uniform(seed=84)
+        initialize_weights_dense = keras.initializers.glorot_uniform(seed=84)
+        
         model.add(KL.Conv2D(5, (6, 6), strides=(2, 2), activation=act, input_shape=input_shape,
                          kernel_initializer=initialize_weights_conv, kernel_regularizer=l2(1e-2)))
         if batchnorm:  
@@ -280,8 +288,10 @@ class Siamese:
         dropout_prob = model_params.get('dropout_prob', 0.2)
         use_second_dense_layer = model_params.get('use_second_dense_layer', False)
     
-        initialize_weights = keras.initializers.RandomNormal(mean=0.0, stddev=0.05, seed=84)  # filters initialize
+        #initialize_weights = keras.initializers.RandomNormal(mean=0.0, stddev=0.05, seed=84)  # filters initialize
         initialize_bias = keras.initializers.RandomNormal(mean=0.5, stddev=0.01, seed=84)  # bias initialize
+        
+        initialize_weights = keras.initializers.glorot_uniform(seed=84)
         
         input_shape = (224, 224, 3)
         first_input = KL.Input(input_shape)
@@ -306,11 +316,12 @@ class Siamese:
             
         new_model = keras.Sequential()
         new_model.add(vggface)
-        new_model.add(KL.Dense(dense_layer_size_1, activation='sigmoid', kernel_initializer=initialize_weights, bias_initializer=initialize_bias))
+        new_model.add(KL.Dense(dense_layer_size_1, activation='relu', kernel_initializer=initialize_weights, bias_initializer=initialize_bias, kernel_regularizer=l2(1e-2)))
+        new_model.add(KL.BatchNormalization())
         new_model.add(KL.Dropout(dropout_prob))
         if use_second_dense_layer:
-            new_model.add(KL.Dense(dense_layer_size_2, activation='sigmoid', kernel_initializer=initialize_weights, bias_initializer=initialize_bias))
-
+            new_model.add(KL.Dense(dense_layer_size_2, activation='relu', kernel_initializer=initialize_weights, bias_initializer=initialize_bias, kernel_regularizer=l2(1e-2)))
+            new_model.add(KL.Dropout(dropout_prob))
         
         first_hidden = new_model(first_input)
         second_hidden = new_model(second_input)
@@ -320,8 +331,8 @@ class Siamese:
         similarity = KL.Dense(1, activation='sigmoid', kernel_initializer=initialize_weights, bias_initializer=initialize_bias)(L1_distance)
         
         final_network = keras.Model(inputs=[first_input, second_input], outputs=similarity)
-        #optimizer = keras.optimizers.Adam(lr=learning_rate)
-        optimizer = keras.optimizers.SGD(lr=learning_rate,decay=decay, momentum=momentum)
+        optimizer = keras.optimizers.Adam(lr=learning_rate)
+        #optimizer = keras.optimizers.SGD(lr=learning_rate,decay=decay, momentum=momentum)
         final_network.compile(loss="binary_crossentropy", optimizer=optimizer, metrics=self.metrics)
         
         self.model = final_network
@@ -338,7 +349,7 @@ def contrastive_loss(y_true, y_pred):
     '''Contrastive loss from Hadsell-et-al.'06
     http://yann.lecun.com/exdb/publis/pdf/hadsell-chopra-lecun-06.pdf
     '''
-    margin = 1
+    margin = 2
     square_pred = K.square(y_pred)
     margin_square = K.square(K.maximum(margin - y_pred, 0))
     return K.mean(y_true * square_pred + (1 - y_true) * margin_square)

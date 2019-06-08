@@ -107,10 +107,11 @@ def _load_image_vgg(path):
     # rezise the image to fit the VGG16 model shape
     resized_image = cv2.resize(backtorgb, dsize=(VGG_IMAGES_DIM, VGG_IMAGES_DIM), interpolation=cv2.INTER_CUBIC)
     reshaped_image = resized_image.reshape(1,224,224,3)
+    #reshaped_image = reshaped_image.astype('float64')
     # taken from the keras_vggface repository
-    reshaped_image[:,:,:,0] -= 93.5940
-    reshaped_image[:,:,:,1] -= 104.7624
-    reshaped_image[:,:,:,2] -= 129.1863     
+    #reshaped_image[:,:,:,0] -= 93.5940
+    #reshaped_image[:,:,:,1] -= 104.7624
+    #reshaped_image[:,:,:,2] -= 129.1863     
     return reshaped_image
 
 
