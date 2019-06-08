@@ -120,7 +120,7 @@ def perpare_triplets():
     
 
 class LFWDataLoader(keras.utils.Sequence):
-    def __init__(self, same_paths, diff_paths, batch_size=32, dim=(IMAGES_DIM, IMAGES_DIM), channels=1, load_image_func=_load_image, shuffle=False, use_allocated_pairs=True, use_worst_pairs=True, size_allocated_pairs=12, model=None):
+    def __init__(self, same_paths, diff_paths, batch_size=32, dim=(IMAGES_DIM, IMAGES_DIM), channels=1, load_image_func=_load_image, shuffle=False, use_allocated_pairs=False, use_worst_pairs=True, size_allocated_pairs=12, model=None):
         
         self.dim = dim
         self.channels = channels
@@ -129,9 +129,9 @@ class LFWDataLoader(keras.utils.Sequence):
         self.diff_paths = diff_paths
         self.batch_size = batch_size
         self.shuffle = shuffle
+        self.use_allocated_pairs = use_allocated_pairs
         self.use_worst_pairs = use_worst_pairs
-        self.size_worst_pairs = size_worst_pairs
-        self.best_pairs = best_pairs
+        self.size_allocated_pairs = size_allocated_pairs
         self.model = model
         self.indexes = np.arange(len(self.same_paths))
         
