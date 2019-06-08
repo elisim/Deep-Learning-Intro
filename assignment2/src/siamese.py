@@ -215,8 +215,8 @@ class Siamese:
         dropout = model_params.get('dropout', 0)
         batchnorm = model_params.get('batchnorm', False)
         loss = model_params.get('loss', contrastive_loss)
-        learning_rate = model_params.get('learning_rate', 1e-3)
-        
+        learning_rate = model_params.get('learning_rate', 1e-3)        
+		
         input_shape = (self.image_dim, self.image_dim, 1)
         first_input = KL.Input(input_shape)
         second_input = KL.Input(input_shape)
