@@ -2,7 +2,6 @@
 Labeled Faces in the Wild dataset of face photographs.
 """
 import pathlib
-import random
 from google_drive_downloader import GoogleDriveDownloader as gdd
 from os.path import join, isdir, exists
 from os import listdir, remove, path
@@ -10,12 +9,10 @@ from shutil import move
 import requests
 from imageio import imread
 import numpy as np
-from tensorflow.python.keras.utils.data_utils import Sequence
 import keras
-import cv2
 
 
-root='../data/lfw2'
+root = '../data/lfw2'
 train_info_url = 'http://vis-www.cs.umass.edu/lfw/pairsDevTrain.txt'
 test_info_url = 'http://vis-www.cs.umass.edu/lfw/pairsDevTest.txt'
 
@@ -102,6 +99,7 @@ def _load_image_vgg(path):
     """
     Load an image to be ready for the VGG16 model.
     """
+    import cv2
     # load the image from the disk
     gray_image = imread(path)
     # transform the grayscale image to RGB
@@ -153,8 +151,8 @@ class LFWDataLoader(keras.utils.Sequence):
                 self.X_pairs[1, index] = self.load_image_func(self.same_paths[index][1])    
                 self.X_pairs[0, index + len(self.diff_paths)] = self.load_image_func(self.diff_paths[index][0])
                 self.X_pairs[1, index + len(self.diff_paths)] = self.load_image_func(self.diff_paths[index][1])
-                self.y_pairs[index] = 1
-                self.y_pairs[index + len(self.diff_paths)] = 0
+                self.y_pairs[index] = 0
+                self.y_pairs[index + len(self.diff_paths)] = 1
         else:
             if (batch_size % 2) != 0:
                 raise(Exception('batch_size need to be dividable by 2'))
@@ -171,7 +169,7 @@ class LFWDataLoader(keras.utils.Sequence):
            
         if self.use_worst_pairs:
             y_pred = self.model.predict([self.X_pairs[0], self.X_pairs[1]])
-            ids_of_worst_pairs = np.argsort(np.abs(y_pred.T[0] - self.y_pairs))[-self.size_worst_pairs:]
+            ids_of_worst_pairs = np.argsort(np.abs(y_pred.T[0] - self.y_pairs))[:self.size_worst_pairs]
                         
             for i in range(self.size_worst_pairs):
                 self.worst_pairs_X[0, i] = self.X_pairs[0, ids_of_worst_pairs[i]]
@@ -191,13 +189,13 @@ class LFWDataLoader(keras.utils.Sequence):
         for id in image_indexes:
             X[0, index] = self.load_image_func(self.same_paths[id][0])
             X[1, index] = self.load_image_func(self.same_paths[id][1])
-            y[index] = 1
+            y[index] = 0
             index += 1
 
         for id in image_indexes:
             X[0, index] = self.load_image_func(self.diff_paths[id][0])
             X[1, index] = self.load_image_func(self.diff_paths[id][1])
-            y[index] = 0
+            y[index] = 1
             index += 1
 
         if self.use_worst_pairs:
