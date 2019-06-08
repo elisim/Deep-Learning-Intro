@@ -160,6 +160,7 @@ class Siamese:
         dense_size = model_params.get('dense_size', 4096)
         momentum = model_params.get('momentum',  0.5)
         decay = model_params.get('decay',  0.01)
+        loss = model_params.get('loss', 'binary_crossentropy')
         
         input_shape = (self.image_dim, self.image_dim, 1)
         first_input = KL.Input(input_shape)
