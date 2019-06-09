@@ -43,26 +43,37 @@ class Siamese:
               batch_size=32, 
               epochs=40, 
               epoch_shuffle=False, 
-              earlystop_patience=10,
               verbose=2,
               use_allocated_pairs=False,
               use_worst_pairs=True,
               size_allocated_pairs=12, 
               model=None):
+        """
+        This function get the training and validation set and various parameters regard the training itself and execute the training 
+        
+        :param same_train_paths: paths of the "same person" in the training set
+        :param diff_train_paths: paths of the "different person" in the training set
+        :param same_val_paths: paths of the "same person" in the validation set
+        :param diff_val_paths: paths of the "different person" in the validation set
+        :param batch_size: the size of each batch in training
+        :param epochs: the number of epochs to execute the trainig
+        :param epoch_shuffle: if True, the samples will be shuffled after each epoch so the batches will be different every time,
+        :param verbose: the verbose level of the training
+        :param use_allocated_pairs: if True, a fixed number of samples which is the best or worst in each epoch will be in every batch in the next epoch
+        :param use_worst_pairs: if True, using the worst pairs in every epoch, otherwise use the best
+        :param size_allocated
+        :return: return the model with the given params
+        """
         
         
         if self.model_type == 'vggface':
+            # if the model is trasfer learning with VGGFace we need to handle the images in a different way
             training_generator = LFWDataLoader(same_train_paths, diff_train_paths, shuffle=epoch_shuffle, batch_size=batch_size, channels=3, load_image_func=_load_image_vgg, dim=(224,224), use_allocated_pairs=use_allocated_pairs, use_worst_pairs=use_worst_pairs, size_allocated_pairs=size_allocated_pairs, model=model)
             validation_generator = LFWDataLoader(same_val_paths, diff_val_paths, shuffle=epoch_shuffle, batch_size=batch_size, channels=3, load_image_func=_load_image_vgg, dim=(224,224))            
         else:
             training_generator = LFWDataLoader(same_train_paths, diff_train_paths, shuffle=epoch_shuffle, batch_size=batch_size, use_allocated_pairs=use_allocated_pairs, use_worst_pairs=use_worst_pairs, size_allocated_pairs=size_allocated_pairs, model=model)
             validation_generator = LFWDataLoader(same_val_paths, diff_val_paths)
     
-        #history = self.model.fit_generator(generator=training_generator,
-        #            validation_data=validation_generator,
-        #            use_multiprocessing=False, verbose=verbose, epochs=epochs,
-        #            callbacks=[keras.callbacks.EarlyStopping(patience=10, verbose=1)])
-        
         history = self.model.fit_generator(generator=training_generator,
                     validation_data=validation_generator,
                     use_multiprocessing=False, verbose=verbose, epochs=epochs)        
@@ -191,7 +202,6 @@ def hyperas_build_hani(same_train_paths, diff_train_paths, same_val_paths, diff_
     model.add(KL.Dropout({{uniform(0, 0.5)}}))
     model.add(KL.MaxPool2D())
 
-    model.add(KL.Dropout(dropout))
     model.add(KL.Conv2D({{choice([5, 10, 14, 30, 60])}}, (6, 6), activation=act, kernel_initializer=initialize_weights_conv,
                         bias_initializer=initialize_bias, kernel_regularizer=l2({{uniform(0, 0.1)}})))
 
