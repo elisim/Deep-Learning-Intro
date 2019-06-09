@@ -82,15 +82,16 @@ def build_hani(**model_params):
 
 def build_hani_best_model(**model_params):
     """
-    :return: the network the mentioned in the Hani et el. paper:
+    :return: the network the mentioned in the Hani et el. paper: 
     --------------------------------------------------------
     Khalil-Hani, M., & Sung, L. S. (2014). A convolutional neural
     network approach for face verification. High Performance Computing
     & Simulation (HPCS), 2014 International Conference on, (3), 707–714.
     doi:10.1109/HPCSim.2014.6903759
+    but with optimized hyperparmeters after the hyperas exection
     """
 
-    act = model_params.get('act', tanh_scaled)
+    act = model_params.get('act', 'relu')
     dropout = model_params.get('dropout', 0)
     batchnorm = model_params.get('batchnorm', False)
     loss = model_params.get('loss', contrastive_loss)
@@ -232,7 +233,6 @@ def build_vggface(**model_params):
     use_second_dense_layer = model_params.get('use_second_dense_layer', False)
     loss = model_params.get('loss', 'binary_crossentropy')
 
-    # initialize_weights = keras.initializers.RandomNormal(mean=0.0, stddev=0.05, seed=84)  # filters initialize
     initialize_bias = keras.initializers.RandomNormal(mean=0.5, stddev=0.01, seed=84)  # bias initialize
 
     initialize_weights = keras.initializers.glorot_uniform(seed=84)
@@ -279,7 +279,6 @@ def build_vggface(**model_params):
 
     final_network = keras.Model(inputs=[first_input, second_input], outputs=similarity)
     optimizer = keras.optimizers.Adam(lr=learning_rate)
-    # optimizer = keras.optimizers.SGD(lr=learning_rate,decay=decay, momentum=momentum)
     final_network.compile(loss=loss, optimizer=optimizer, metrics=['accuracy'])
 
     return final_network
