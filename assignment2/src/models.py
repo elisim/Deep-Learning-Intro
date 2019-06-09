@@ -65,12 +65,84 @@ def build_hani(**model_params):
     encoded_r = model(second_input)
 
     # calculate similarity
-    L2_distance = KL.Lambda(euclidean_distance)([encoded_l, encoded_r])
+    if loss == 'binary_crossentropy':
+        L1_layer = KL.Lambda(lambda tensors: K.abs(tensors[0] - tensors[1]))
+        L1_distance = L1_layer([encoded_l, encoded_r])
+        similarity = KL.Dense(1, activation='sigmoid', bias_initializer=initialize_bias)(L1_distance)
+    else:
+        similarity = KL.Lambda(euclidean_distance)([encoded_l, encoded_r])
 
+    
     # final network
-    final_network = keras.Model(inputs=[first_input, second_input], outputs=L2_distance)
+    final_network = keras.Model(inputs=[first_input, second_input], outputs=similarity)
     optimizer = keras.optimizers.Adam(lr=learning_rate)
+    print(loss)
     final_network.compile(loss=loss, optimizer=optimizer, metrics=['accuracy'])
+    return final_network
+
+def build_hani_best_model(**model_params):
+    """
+    :return: the network the mentioned in the Hani et el. paper:
+    --------------------------------------------------------
+    Khalil-Hani, M., & Sung, L. S. (2014). A convolutional neural
+    network approach for face verification. High Performance Computing
+    & Simulation (HPCS), 2014 International Conference on, (3), 707–714.
+    doi:10.1109/HPCSim.2014.6903759
+    """
+
+    act = model_params.get('act', tanh_scaled)
+    dropout = model_params.get('dropout', 0)
+    batchnorm = model_params.get('batchnorm', False)
+    loss = model_params.get('loss', contrastive_loss)
+    learning_rate = model_params.get('learning_rate', 1e-3)
+    input_shape = (IMAGES_DIM, IMAGES_DIM, 1)
+    first_input = KL.Input(input_shape)
+    second_input = KL.Input(input_shape)
+
+    model = keras.Sequential()
+    initialize_weights_conv = keras.initializers.glorot_uniform(seed=84)  # filters initialize
+    initialize_weights_dense = keras.initializers.glorot_uniform(seed=84)  # dense initialize  
+    initialize_bias = keras.initializers.RandomNormal(mean=0.5, stddev=0.01, seed=84)  # bias initialize
+
+    model.add(KL.Conv2D(5, (6, 6), strides=(2, 2), activation=act, input_shape=input_shape,
+                        kernel_initializer=initialize_weights_conv, kernel_regularizer=l2(0.03148394777069553)))
+
+    model.add(KL.BatchNormalization())
+    model.add(KL.Dropout(0.3065491917788273))
+    model.add(KL.MaxPool2D())
+
+    model.add(KL.Conv2D(14, (6, 6), strides=(2, 2), activation=act, kernel_initializer=initialize_weights_conv,
+                        bias_initializer=initialize_bias, kernel_regularizer=l2(0.054048669207277224)))
+    #model.add(KL.BatchNormalization())
+    model.add(KL.Dropout(0.4797699256757003))
+    model.add(KL.MaxPool2D())
+
+    model.add(KL.Conv2D(60, (6, 6), activation=act, kernel_initializer=initialize_weights_conv,
+                        bias_initializer=initialize_bias, kernel_regularizer=l2(0.06189584230948173)))
+
+    model.add(KL.BatchNormalization())
+    model.add(KL.Dropout(0.020012398358003752))
+    model.add(KL.MaxPool2D())
+
+    model.add(KL.Flatten())
+
+    model.add(KL.Dense(40, activation=act, kernel_regularizer=l2(0.082430594544267),
+                       kernel_initializer=initialize_weights_dense, bias_initializer=initialize_bias))
+    model.add(KL.Dropout(0.012533877486030926))
+    model.add(KL.Dense(40, activation=None, kernel_regularizer=l2(0.046085917780636185),
+                       kernel_initializer=initialize_weights_dense, bias_initializer=initialize_bias))
+    model.add(KL.Dropout(0.05086327591390307))
+        
+    # Generate the encodings (feature vectors) for the two images
+    encoded_l = model(first_input)
+    encoded_r = model(second_input)
+
+    # calculate similarity
+    L1_distance = KL.Lambda(lambda tensors: K.abs(tensors[0] - tensors[1]))([encoded_l, encoded_r])
+    similarity = KL.Dense(1, activation='sigmoid', kernel_initializer=initialize_weights_dense, bias_initializer=initialize_bias)(L1_distance)
+    final_network = keras.Model(inputs=[first_input, second_input], outputs=similarity)                                                                         
+    optimizer = keras.optimizers.SGD(lr=0.03863427079945416, momentum=0.8962431889503087, decay=0.019965108317109886)      
+    final_network.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
     return final_network
 
 

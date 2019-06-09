@@ -47,7 +47,7 @@ def load_data(val_size=0.2):
 
     diff_val_paths = diff_train_paths[val_indexes]
     diff_train_paths = diff_train_paths[train_indexes]
-
+    
     return same_train_paths, diff_train_paths, same_val_paths, diff_val_paths, same_test_paths, diff_test_paths
 
 

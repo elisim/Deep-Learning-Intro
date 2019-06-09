@@ -1,5 +1,5 @@
 import src.models as models
-from src.lfw_dataset import LFWDataLoader, _load_image_vgg
+from src.lfw_dataset import LFWDataLoader, _load_image_vgg, load_data
 import tensorflow as tf
 import keras
 from keras.regularizers import l2
@@ -123,7 +123,7 @@ class Siamese:
         """
         trials = Trials()
         best_run, best_model = optim.minimize(model=hyperas_build_hani,
-                                              data=lfw_dataset.load_data,
+                                              data=load_data,
                                               algo=tpe.suggest,
                                               max_evals=100,
                                               trials=trials)
@@ -141,13 +141,14 @@ def hyperas_build_hani(same_train_paths, diff_train_paths, same_val_paths, diff_
     KL = keras.layers
     
 	# generators
-    training_generator = LFWDataLoader(same_train_paths, diff_train_paths, epoch_shuffle=True)
+    training_generator = LFWDataLoader(same_train_paths, diff_train_paths, shuffle=True)
     validation_generator = LFWDataLoader(same_val_paths, diff_val_paths)
 
     input_shape = (250, 250, 1)
 	
+    from datetime import datetime
     from os.path import isdir, exists
-    from lfw_dataset import _extract_samples_paths, train_info_url, test_info_url
+    from src.lfw_dataset import _extract_samples_paths, train_info_url, test_info_url
     import numpy as np
     first_input = KL.Input(input_shape)
     second_input = KL.Input(input_shape)        
@@ -157,109 +158,78 @@ def hyperas_build_hani(same_train_paths, diff_train_paths, same_val_paths, diff_
         B = 2 / 3
         return A * K.tanh(B * x)
 
+    model_params = {}
+    
     act = model_params.get('act', tanh_scaled)
     dropout = model_params.get('dropout', 0)
     batchnorm = model_params.get('batchnorm', False)
-    loss = model_params.get('loss', contrastive_loss)
+    #loss = model_params.get('loss', contrastive_loss)
     learning_rate = model_params.get('learning_rate', 1e-3)
-    input_shape = (IMAGES_DIM, IMAGES_DIM, 1)
     first_input = KL.Input(input_shape)
     second_input = KL.Input(input_shape)
 
+    batchnorm = True
+    dropout = True    
+    act='relu'   
+    
     model = keras.Sequential()
     
-    if {{choice(['xavier', 'random'])}} == 'xavier':
-        initialize_weights_conv = keras.initializers.glorot_uniform(seed=84)  # filters initialize
-        initialize_weights_dense = keras.initializers.glorot_uniform(seed=84)  # dense initialize
-    else:
-        initialize_weights_conv = keras.initializers.RandomNormal(mean=0.0, stddev=0.01, seed=84)  # filters initialize
-        initialize_weights_dense = keras.initializers.RandomNormal(mean=0.0, stddev=0.2, seed=84)  # dense initialize
-        
-    if {{choice(['batchnorm', 'no_batchnorm'])}} == 'batchnorm':
-        batchnorm = True
-    else
-        batchnorm = False
-    
-    if {{choice(['dropout', 'no_dropout'])}} == 'dropout':
-        dropout = True
-    else:
-        dropout = False
-        
-    if {{choice(['relu', 'tanh'])}} == 'relu':
-        act = 'relu'
-    else:
-        act = tanh_scaled
-
+    initialize_weights_conv = keras.initializers.glorot_uniform(seed=84)  # filters initialize
+    initialize_weights_dense = keras.initializers.glorot_uniform(seed=84)  # dense initialize  
     initialize_bias = keras.initializers.RandomNormal(mean=0.5, stddev=0.01, seed=84)  # bias initialize
 
-    model.add(KL.Conv2D(5, (6, 6), strides=(2, 2), activation=act, input_shape=input_shape,
+    model.add(KL.Conv2D({{choice([5, 10, 14, 30, 60])}}, (6, 6), strides=(2, 2), activation=act, input_shape=input_shape,
                         kernel_initializer=initialize_weights_conv, kernel_regularizer=l2({{uniform(0, 0.1)}})))
-    if batchnorm:
-        model.add(KL.BatchNormalization())
-    if dropout:
-        model.add(KL.Dropout({{uniform(0, 0.4)}}))
+
+    #model.add(KL.BatchNormalization())
+    model.add(KL.Dropout({{uniform(0, 0.5)}}))
     model.add(KL.MaxPool2D())
 
-    model.add(KL.Conv2D(14, (6, 6), strides=(2, 2), activation=act, kernel_initializer=initialize_weights_conv,
+    model.add(KL.Conv2D({{choice([5, 10, 14, 30, 60])}}, (6, 6), strides=(2, 2), activation=act, kernel_initializer=initialize_weights_conv,
                         bias_initializer=initialize_bias, kernel_regularizer=l2({{uniform(0, 0.1)}})))
-    if batchnorm:
-        model.add(KL.BatchNormalization())
-    if dropout:
-        model.add(KL.Dropout({{uniform(0, 0.4)}}))
+    #model.add(KL.BatchNormalization())
+    model.add(KL.Dropout({{uniform(0, 0.5)}}))
     model.add(KL.MaxPool2D())
 
     model.add(KL.Dropout(dropout))
-    model.add(KL.Conv2D(60, (6, 6), activation=act, kernel_initializer=initialize_weights_conv,
+    model.add(KL.Conv2D({{choice([5, 10, 14, 30, 60])}}, (6, 6), activation=act, kernel_initializer=initialize_weights_conv,
                         bias_initializer=initialize_bias, kernel_regularizer=l2({{uniform(0, 0.1)}})))
-    if batchnorm:
-        model.add(KL.BatchNormalization())
-    if dropout:
-        model.add(KL.Dropout({{uniform(0, 0.4)}}))
+
+    #model.add(KL.BatchNormalization())
+    model.add(KL.Dropout({{uniform(0, 0.5)}}))
     model.add(KL.MaxPool2D())
 
     model.add(KL.Flatten())
 
     model.add(KL.Dense({{choice([40, 64, 128, 256])}}, activation=act, kernel_regularizer=l2({{uniform(0, 0.1)}}),
                        kernel_initializer=initialize_weights_dense, bias_initializer=initialize_bias))
-    if dropout:
-        model.add(KL.Dropout({{uniform(0, 0.4)}}))
+    model.add(KL.Dropout({{uniform(0, 0.5)}}))
     model.add(KL.Dense({{choice([40, 64, 128, 256])}}, activation=None, kernel_regularizer=l2({{uniform(0, 0.1)}}),
                        kernel_initializer=initialize_weights_dense, bias_initializer=initialize_bias))
-    if dropout:
-        model.add(KL.Dropout({{uniform(0, 0.4)}}))
+    model.add(KL.Dropout({{uniform(0, 0.5)}}))
         
     # Generate the encodings (feature vectors) for the two images
     encoded_l = model(first_input)
     encoded_r = model(second_input)
 
-    if {{choice(['binary_crossentropy', 'constrastive'])}} == 'binary_crossentropy':
-        # calculate similarity
-        L1_distance = KL.Lambda(lambda tensors: K.abs(tensors[0] - tensors[1]))([encoded_l, encoded_r])
-        similarity = KL.Dense(1, activation='sigmoid', kernel_initializer=initialize_weights, bias_initializer=initialize_bias)(L1_distance)
-
-        final_network = keras.Model(inputs=[first_input, second_input], outputs=similarity)                                                                         
-        optimizer = keras.optimizers.SGD(lr={{uniform(0.0001, 0.1)}}, momentum={{uniform(0,1)}}, decay={{uniform(0,0.1)}})      
-        final_network.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
-    else:
-        # calculate similarity
-        L2_distance = KL.Lambda(euclidean_distance)([encoded_l, encoded_r])
-
-        # final network
-        final_network = keras.Model(inputs=[first_input, second_input], outputs=L2_distance)
-        optimizer = keras.optimizers.SGD(lr={{uniform(0.0001, 0.1)}}, momentum={{uniform(0,1)}}, decay={{uniform(0,0.1)}})
-        final_network.compile(loss=contrastive_loss, optimizer=optimizer, metrics=['accuracy'])
-
+    
+    # calculate similarity
+    L1_distance = KL.Lambda(lambda tensors: K.abs(tensors[0] - tensors[1]))([encoded_l, encoded_r])
+    similarity = KL.Dense(1, activation='sigmoid', kernel_initializer=initialize_weights_dense, bias_initializer=initialize_bias)(L1_distance)
+    final_network = keras.Model(inputs=[first_input, second_input], outputs=similarity)                                                                         
+    optimizer = keras.optimizers.SGD(lr={{uniform(0.0001, 0.1)}}, momentum={{uniform(0,1)}}, decay={{uniform(0,0.1)}})      
+    final_network.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
+    
     start_time = datetime.now()
     history = final_network.fit_generator(generator=training_generator,
 									  validation_data=validation_generator,
-									  use_multiprocessing=False, verbose=0, epochs=100)
+									  use_multiprocessing=False, verbose=2, epochs=30)
     end_time = datetime.now()
     
     validation_acc = np.amax(history.history['val_acc'])
     print('Best validation acc of epoch:', validation_acc)
     
-    
     test_generator = LFWDataLoader(same_test_paths, diff_test_paths)
     test_loss, test_accuracy = final_network.evaluate_generator(test_generator)
     
-    return {'loss': -validation_acc, 'status': STATUS_OK, 'history': history.history, 'training_time': end_time-start_time, 'test_loss': test_loss, 'test_accuracy': test_sccuracy}
+    return {'loss': -validation_acc, 'status': STATUS_OK, 'history': history.history, 'training_time': end_time-start_time, 'test_loss': test_loss, 'test_accuracy': test_accuracy}
