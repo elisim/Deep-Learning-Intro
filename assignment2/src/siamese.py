@@ -61,10 +61,10 @@ class Siamese:
         :param verbose: the verbose level of the training
         :param use_allocated_pairs: if True, a fixed number of samples which is the best or worst in each epoch will be in every batch in the next epoch
         :param use_worst_pairs: if True, using the worst pairs in every epoch, otherwise use the best
-        :param size_allocated
+        :param size_allocated: the amount of allocated samples we want to fix
+        :param model: the model to check the pairs on
         :return: return the model with the given params
         """
-        
         
         if self.model_type == 'vggface':
             # if the model is trasfer learning with VGGFace we need to handle the images in a different way
@@ -81,7 +81,13 @@ class Siamese:
         return history  
 
     def predict(self, same_paths, diff_paths):
-        ##### TODO do flatten on gen
+        """
+        Get paths for group of "same persons" and "different persons" and return the prediction of the model and the original label 
+        
+        :param same_paths: paths of the "same person"
+        :param diff_paths: paths of the "different person"
+        :return: predictions and true label of the samples
+        """
         generator = LFWDataLoader(same_paths, diff_paths, batch_size=len(same_paths)*2, shuffle=False)
         X,y = list(generator)[0]
         return self.model.predict([X[0], X[1]]), y
@@ -147,6 +153,9 @@ class Siamese:
 
     
 def hyperas_build_hani(same_train_paths, diff_train_paths, same_val_paths, diff_val_paths, same_test_paths, diff_test_paths):
+    """
+    A template function for Hyperas to execute tests 
+    """
     import keras
     K = keras.backend
     KL = keras.layers
@@ -192,20 +201,20 @@ def hyperas_build_hani(same_train_paths, diff_train_paths, same_val_paths, diff_
     model.add(KL.Conv2D({{choice([5, 10, 14, 30, 60])}}, (6, 6), strides=(2, 2), activation=act, input_shape=input_shape,
                         kernel_initializer=initialize_weights_conv, kernel_regularizer=l2({{uniform(0, 0.1)}})))
 
-    #model.add(KL.BatchNormalization())
+    model.add(KL.BatchNormalization())
     model.add(KL.Dropout({{uniform(0, 0.5)}}))
     model.add(KL.MaxPool2D())
 
     model.add(KL.Conv2D({{choice([5, 10, 14, 30, 60])}}, (6, 6), strides=(2, 2), activation=act, kernel_initializer=initialize_weights_conv,
                         bias_initializer=initialize_bias, kernel_regularizer=l2({{uniform(0, 0.1)}})))
-    #model.add(KL.BatchNormalization())
+    model.add(KL.BatchNormalization())
     model.add(KL.Dropout({{uniform(0, 0.5)}}))
     model.add(KL.MaxPool2D())
 
     model.add(KL.Conv2D({{choice([5, 10, 14, 30, 60])}}, (6, 6), activation=act, kernel_initializer=initialize_weights_conv,
                         bias_initializer=initialize_bias, kernel_regularizer=l2({{uniform(0, 0.1)}})))
 
-    #model.add(KL.BatchNormalization())
+    model.add(KL.BatchNormalization())
     model.add(KL.Dropout({{uniform(0, 0.5)}}))
     model.add(KL.MaxPool2D())
 
