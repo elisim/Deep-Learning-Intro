@@ -1,5 +1,7 @@
 import os
 import itertools
+import numpy as np
+from sklearn.preprocessing import OneHotEncoder
 
 ROOT_PATH = ".."
 DATA_PATH = "Data"
@@ -20,11 +22,12 @@ def parse_input_line(line):
 
 
 def parse_lyrices_line(line):
-    splitted_line = line.split(',')
-    return {'artist': splitted_line[0], 'song_name': splitted_line[1], 'lyrics': ''.join(splitted_line[2:])}
+    splitted_line = line.split(',');
+    return {'artist': splitted_line[0], 'song_name': splitted_line[1], 'lyrics': ''.join(splitted_line[2:]), 'X': [],
+            'y': []}
 
 
-def prepare_train_data():
+def prepare_train_data(window_size=10):
     midi_files_list = [filename.lower() for filename in os.listdir(os.path.join(ROOT_PATH,DATA_PATH, MIDI_PATH))]
 
     with open(os.path.join(ROOT_PATH, DATA_PATH, LYRICS_TRAIN)) as fh:
@@ -36,6 +39,7 @@ def prepare_train_data():
 
     parsed_songs = list(itertools.chain.from_iterable(parsed_songs))
 
+    # get midi path for each song
     for i,song in enumerate(parsed_songs):
         midi_file_path = '{}_-_{}.mid'.format(song['artist'].replace(' ', '_'), song['song_name'].replace(' ', '_'))
         if sum([1 for filename in midi_files_list if midi_file_path[:-4].replace('\\', '') in filename]) > 0:
@@ -43,5 +47,35 @@ def prepare_train_data():
         else:
             print('song {} doesnt have a midi'.format(song))
 
-    return parsed_songs
+    # add special tokens
+    for i, song in enumerate(parsed_songs):
+        # change & sign in <EOL>
+        parsed_songs[i]['lyrics'] = parsed_songs[i]['lyrics'].replace('&', '<EOL>')
+
+        # add <EOS> in the end
+        parsed_songs[i]['lyrics'] += " <EOS>"
+
+    # split lyrics by windows size
+    for i, song in enumerate(parsed_songs):
+        splitted_lyrics = parsed_songs[i]['lyrics'].split()
+        for window in range(len(splitted_lyrics) - window_size):
+            parsed_songs[i]['X'].append(splitted_lyrics[window: window + window_size])
+            parsed_songs[i]['y'].append(splitted_lyrics[window + 1: window + window_size + 1])
+        parsed_songs[i]['X'] = np.array(parsed_songs[i]['X'])
+        parsed_songs[i]['y'] = np.array(parsed_songs[i]['y'])
+
+    # prepare one hot encoding of the lyrics
+    all_words = np.array(list(set(itertools.chain.from_iterable([song['lyrics'].split() for song in parsed_songs])))).reshape(-1, 1)
+    encoder = OneHotEncoder(sparse=False)
+    encoder.fit(all_words)
+
+    #TODO: encode all words in X and y
+
+    return parsed_songs, encoder
+
+
+def get_encoded_word(enc, word):
+    return enc.transform(np.array([word]).reshape(-1,1)).flatten()
+
+
 
