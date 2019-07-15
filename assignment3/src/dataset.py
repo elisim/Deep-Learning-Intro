@@ -48,9 +48,9 @@ def prepare_train_data(window_size=10):
     # add special tokens
     for i, song in enumerate(parsed_songs):
         # change & sign in <EOL> and remove redundent -
-        parsed_songs[i]['lyrics'] = parsed_songs[i]['lyrics'].replace('&', '<EOL>').replace('-','')
+        parsed_songs[i]['lyrics'] = parsed_songs[i]['lyrics'].lower().replace('&', '<EOL>').replace('-','')
 
-        # add <EOS> in the end
+        # add <EOS> in the en
         parsed_songs[i]['lyrics'] += " <EOS>"
 
     # split lyrics by windows size
