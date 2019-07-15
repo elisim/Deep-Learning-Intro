@@ -44,8 +44,6 @@ def prepare_train_data(window_size=10):
         midi_file_path = '{}_-_{}.mid'.format(song['artist'].replace(' ', '_'), song['song_name'].replace(' ', '_'))
         if sum([1 for filename in midi_files_list if midi_file_path[:-4].replace('\\', '') in filename]) > 0:
             parsed_songs[i]['midi_path'] = os.path.join(ROOT_PATH,DATA_PATH, midi_file_path)
-        else:
-            print('song {} doesnt have a midi'.format(song))
 
     # add special tokens
     for i, song in enumerate(parsed_songs):
@@ -64,18 +62,26 @@ def prepare_train_data(window_size=10):
         parsed_songs[i]['X'] = np.array(parsed_songs[i]['X'])
         parsed_songs[i]['y'] = np.array(parsed_songs[i]['y'])
 
-    # prepare one hot encoding of the lyrics
-    all_words = np.array(list(set(itertools.chain.from_iterable([song['lyrics'].split() for song in parsed_songs])))).reshape(-1, 1)
-    encoder = OneHotEncoder(sparse=False)
-    encoder.fit(all_words)
+    # # prepare one hot encoding of the lyrics
+    # all_words = np.array(list(set(itertools.chain.from_iterable([song['lyrics'].split() for song in parsed_songs])))).reshape(-1, 1)
+    # encoder = OneHotEncoder(sparse=False)
+    # encoder.fit(all_words)
+    #return parsed_songs, encoder
 
-    #TODO: encode all words in X and y
+    return parsed_songs
 
-    return parsed_songs, encoder
-
-
-def get_encoded_word(enc, word):
-    return enc.transform(np.array([word]).reshape(-1,1)).flatten()
-
+# # Relevant if we are using OHE manually
+# def get_encoded_word(enc, word):
+#     return enc.transform(np.array([word]).reshape(-1,1)).flatten()
 
 
+def load_data(window_size=10):
+    parsed_songs = prepare_train_data(window_size)
+
+    X = np.concatenate([song['X'] for song in parsed_songs])
+    y = np.concatenate([song['y'] for song in parsed_songs])
+    return X, y
+
+def apply_embedding():
+    #TODO: implement embedding
+    pass
