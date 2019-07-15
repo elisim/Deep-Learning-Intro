@@ -47,8 +47,8 @@ def prepare_train_data(window_size=10):
 
     # add special tokens
     for i, song in enumerate(parsed_songs):
-        # change & sign in <EOL>
-        parsed_songs[i]['lyrics'] = parsed_songs[i]['lyrics'].replace('&', '<EOL>')
+        # change & sign in <EOL> and remove redundent -
+        parsed_songs[i]['lyrics'] = parsed_songs[i]['lyrics'].replace('&', '<EOL>').replace('-','')
 
         # add <EOS> in the end
         parsed_songs[i]['lyrics'] += " <EOS>"
