@@ -2,10 +2,12 @@ import os
 import itertools
 import numpy as np
 from tqdm import tqdm
+import re
+import string
 
 from sklearn.preprocessing import OneHotEncoder
 
-ROOT_PATH = ".."
+ROOT_PATH = "."
 DATA_PATH = "Data"
 MIDI_PATH = "midi_files"
 LYRICS_TRAIN = "lyrics_train_set.csv"
@@ -55,6 +57,13 @@ def prepare_train_data(window_size=10):
     for i, song in enumerate(parsed_songs):
         # change & sign in <EOL> and remove redundent dash
         parsed_songs[i]['lyrics'] = parsed_songs[i]['lyrics'].lower().replace('&', '<EOL>').replace('-','')
+        # remove information between brackets
+        parsed_songs[i]['lyrics'] = re.sub(r' ?\([^)]+\)', '', parsed_songs[i]['lyrics'])
+        parsed_songs[i]['lyrics'] = re.sub(r' ?\[[^]]+\]', '', parsed_songs[i]['lyrics'])
+
+        # remove punctuations
+        for char in [char for char in string.punctuation if char not in ['<', '>']]:
+            parsed_songs[i]['lyrics'].replace('{} '.format(char), ' ').replace(' {}'.format(char), ' ')
 
         # add <EOS> in the end of each song
         parsed_songs[i]['lyrics'] += " <EOS>"
