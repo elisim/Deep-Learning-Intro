@@ -101,3 +101,9 @@ def load_data(window_size=10):
     X = np.vstack([song['X'] for song in parsed_songs])
     y = np.vstack([song['y'] for song in parsed_songs])
     return X, y
+
+
+def dump_lyrics_to_file():
+    with open(os.path.join(ROOT_PATH, DATA_PATH, 'unified_lyrics_dump.txt'), 'w') as fh:
+        X, _ = load_data()
+        fh.write(' '.join(X.flatten()))
