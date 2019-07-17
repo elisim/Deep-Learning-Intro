@@ -1,7 +1,6 @@
 import os
 import itertools
 import numpy as np
-import spacy
 from tqdm import tqdm
 
 from sklearn.preprocessing import OneHotEncoder
@@ -30,7 +29,7 @@ def parse_lyrices_line(line):
             'X': [], 'y': []}
 
 
-def prepare_train_data(spacy_obj, window_size=10):
+def prepare_train_data(window_size=10):
     # extract list of midi files
     midi_files_list = [filename.lower() for filename in os.listdir(os.path.join(ROOT_PATH,DATA_PATH, MIDI_PATH))]
 
@@ -62,10 +61,7 @@ def prepare_train_data(spacy_obj, window_size=10):
 
     # split lyrics by windows size
     for i, song in enumerate(tqdm(parsed_songs, total=len(parsed_songs))):
-        if spacy_obj:
-            splitted_lyrics = [token.vector for token in spacy_obj(parsed_songs[i]['lyrics'])]
-        else:
-            splitted_lyrics = parsed_songs[i]['lyrics'].split()
+        splitted_lyrics = parsed_songs[i]['lyrics'].split()
         for window in range(len(splitted_lyrics) - window_size):
             parsed_songs[i]['X'].append(splitted_lyrics[window: window + window_size])
             parsed_songs[i]['y'].append(splitted_lyrics[window + 1: window + window_size + 1])
@@ -85,12 +81,13 @@ def prepare_train_data(spacy_obj, window_size=10):
 #     return enc.transform(np.array([word]).reshape(-1,1)).flatten()
 
 
-def load_data(window_size=10, return_word2vec=True):
-    nlp = None
-    if return_word2vec:
-        nlp = spacy.load('en_core_web_md')
+def load_vocab():
+    X, _ = load_data()
+    return list(set(X.flatten()))
 
-    parsed_songs = prepare_train_data(spacy_obj=nlp, window_size=window_size)
+
+def load_data(window_size=10):
+    parsed_songs = prepare_train_data(window_size=window_size)
 
     X = np.vstack([song['X'] for song in parsed_songs])
     y = np.vstack([song['y'] for song in parsed_songs])
