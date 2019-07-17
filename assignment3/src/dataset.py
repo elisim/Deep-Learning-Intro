@@ -58,12 +58,13 @@ def prepare_train_data(window_size=10):
         # change & sign in <EOL> and remove redundent dash
         parsed_songs[i]['lyrics'] = parsed_songs[i]['lyrics'].lower().replace('&', '<EOL>').replace('-','')
         # remove information between brackets
-        parsed_songs[i]['lyrics'] = re.sub(r' ?\([^)]+\)', '', parsed_songs[i]['lyrics'])
-        parsed_songs[i]['lyrics'] = re.sub(r' ?\[[^]]+\]', '', parsed_songs[i]['lyrics'])
+        #parsed_songs[i]['lyrics'] = re.sub(r' ?\([^)]+\)', '', parsed_songs[i]['lyrics'])
+        #parsed_songs[i]['lyrics'] = re.sub(r' ?\[[^]]+\]', '', parsed_songs[i]['lyrics'])
 
-        # remove punctuations
+        # pad punctuations
         for char in [char for char in string.punctuation if char not in ['<', '>']]:
-            parsed_songs[i]['lyrics'].replace('{} '.format(char), ' ').replace(' {}'.format(char), ' ')
+            parsed_songs[i]['lyrics'] = parsed_songs[i]['lyrics'].replace('{} '.format(char), ' {} '.format(char)).replace(' {}'.format(char), ' {} '.format(char))
+            #parsed_songs[i]['lyrics'] = parsed_songs[i]['lyrics'].replace('{} '.format(char), ' ').replace(' {}'.format(char), ' ')
 
         # add <EOS> in the end of each song
         parsed_songs[i]['lyrics'] += " <EOS>"
