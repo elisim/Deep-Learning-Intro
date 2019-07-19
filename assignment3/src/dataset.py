@@ -62,7 +62,7 @@ def prepare_train_data():
 
         # add <EOS> in the end of each song and change & to </s>
         parsed_songs[i]['lyrics'] = parsed_songs[i]['lyrics'].replace('&', '.')
-        parsed_songs[i]['lyrics'] += " <EOS>"
+        parsed_songs[i]['lyrics'] += " eos"
 
     # split lyrics by windows size
     for i, song in enumerate(tqdm(parsed_songs, total=len(parsed_songs))):
@@ -111,3 +111,5 @@ def get_embedding_weights(embedding_type='glove'):
     else:
         word_model = gensim.models.KeyedVectors.load_word2vec_format('pre_trained_embeddings/GoogleNews-vectors-negative300.bin', binary=True)
         word_model.wv
+
+load_data()
