@@ -4,6 +4,8 @@ import numpy as np
 from tqdm import tqdm
 import re
 import string
+import gensim
+import nltk
 
 from sklearn.preprocessing import OneHotEncoder
 
@@ -31,7 +33,7 @@ def parse_lyrices_line(line):
             'X': [], 'y': []}
 
 
-def prepare_train_data(window_size=10):
+def prepare_train_data():
     # extract list of midi files
     midi_files_list = [filename.lower() for filename in os.listdir(os.path.join(ROOT_PATH,DATA_PATH, MIDI_PATH))]
 
@@ -56,25 +58,18 @@ def prepare_train_data(window_size=10):
     # add special tokens
     for i, song in enumerate(parsed_songs):
         # change & sign in <EOL> and remove redundent dash
-        parsed_songs[i]['lyrics'] = parsed_songs[i]['lyrics'].lower().replace('&', '<EOL>').replace('-','')
-        # remove information between brackets
-        #parsed_songs[i]['lyrics'] = re.sub(r' ?\([^)]+\)', '', parsed_songs[i]['lyrics'])
-        #parsed_songs[i]['lyrics'] = re.sub(r' ?\[[^]]+\]', '', parsed_songs[i]['lyrics'])
+        parsed_songs[i]['lyrics'] = ' '.join(nltk.word_tokenize(parsed_songs[i]['lyrics']))
 
-        # pad punctuations
-        for char in [char for char in string.punctuation if char not in ['<', '>']]:
-            parsed_songs[i]['lyrics'] = parsed_songs[i]['lyrics'].replace('{} '.format(char), ' {} '.format(char)).replace(' {}'.format(char), ' {} '.format(char))
-            #parsed_songs[i]['lyrics'] = parsed_songs[i]['lyrics'].replace('{} '.format(char), ' ').replace(' {}'.format(char), ' ')
-
-        # add <EOS> in the end of each song
+        # add <EOS> in the end of each song and change & to </s>
+        parsed_songs[i]['lyrics'] = parsed_songs[i]['lyrics'].replace('&', '</s>')
         parsed_songs[i]['lyrics'] += " <EOS>"
 
     # split lyrics by windows size
     for i, song in enumerate(tqdm(parsed_songs, total=len(parsed_songs))):
-        splitted_lyrics = parsed_songs[i]['lyrics'].split()
-        for window in range(len(splitted_lyrics) - window_size):
-            parsed_songs[i]['X'].append(splitted_lyrics[window: window + window_size])
-            parsed_songs[i]['y'].append(splitted_lyrics[window + 1: window + window_size + 1])
+        splitted_lyrics = [token for token in nltk.word_tokenize(parsed_songs[i]['lyrics']) if token not in string.punctuation]
+        for j in range(len(splitted_lyrics) - 1):
+            parsed_songs[i]['X'].append(splitted_lyrics[j])
+            parsed_songs[i]['y'].append(splitted_lyrics[j+1])
         parsed_songs[i]['X'] = np.array(parsed_songs[i]['X'])
         parsed_songs[i]['y'] = np.array(parsed_songs[i]['y'])
 
@@ -96,8 +91,8 @@ def load_vocab():
     return list(set(X.flatten()))
 
 
-def load_data(window_size=10):
-    parsed_songs = prepare_train_data(window_size=window_size)
+def load_data():
+    parsed_songs = prepare_train_data()
 
     X = np.vstack([song['X'] for song in parsed_songs])
     y = np.vstack([song['y'] for song in parsed_songs])
@@ -108,3 +103,11 @@ def dump_lyrics_to_file():
     with open(os.path.join(ROOT_PATH, DATA_PATH, 'unified_lyrics_dump.txt'), 'w') as fh:
         X, _ = load_data()
         fh.write(' '.join(X.flatten()))
+
+
+def get_embedding_weights(embedding_type='glove'):
+    if embedding_type == 'glove':
+        print('Not implemented')
+    else:
+        word_model = gensim.models.KeyedVectors.load_word2vec_format('pre_trained_embeddings/GoogleNews-vectors-negative300.bin', binary=True)
+        word_model.wv
