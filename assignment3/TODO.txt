@@ -1,0 +1,5 @@
+1. tokenizer to dataset create
+2. model 
+3. prepare embeddings
+4 midi
+5. Todo: solve unknown word in pretrained_embeddings (words with ')
