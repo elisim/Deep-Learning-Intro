@@ -61,12 +61,12 @@ def prepare_train_data():
         parsed_songs[i]['lyrics'] = ' '.join(nltk.word_tokenize(parsed_songs[i]['lyrics']))
 
         # add <EOS> in the end of each song and change & to </s>
-        parsed_songs[i]['lyrics'] = parsed_songs[i]['lyrics'].replace('&', '</s>')
+        parsed_songs[i]['lyrics'] = parsed_songs[i]['lyrics'].replace('&', '.')
         parsed_songs[i]['lyrics'] += " <EOS>"
 
     # split lyrics by windows size
     for i, song in enumerate(tqdm(parsed_songs, total=len(parsed_songs))):
-        splitted_lyrics = [token for token in nltk.word_tokenize(parsed_songs[i]['lyrics']) if token not in string.punctuation]
+        splitted_lyrics = [token for token in nltk.word_tokenize(parsed_songs[i]['lyrics']) if token == '.' or token not in string.punctuation]
         for j in range(len(splitted_lyrics) - 1):
             parsed_songs[i]['X'].append(splitted_lyrics[j])
             parsed_songs[i]['y'].append(splitted_lyrics[j+1])
@@ -111,6 +111,3 @@ def get_embedding_weights(embedding_type='glove'):
     else:
         word_model = gensim.models.KeyedVectors.load_word2vec_format('pre_trained_embeddings/GoogleNews-vectors-negative300.bin', binary=True)
         word_model.wv
-
-
-load_data()
