@@ -94,8 +94,8 @@ def load_vocab():
 def load_data():
     parsed_songs = prepare_train_data()
 
-    X = np.vstack([song['X'] for song in parsed_songs])
-    y = np.vstack([song['y'] for song in parsed_songs])
+    X = np.hstack([song['X'] for song in parsed_songs])
+    y = np.hstack([song['y'] for song in parsed_songs])
     return X, y
 
 
@@ -111,3 +111,6 @@ def get_embedding_weights(embedding_type='glove'):
     else:
         word_model = gensim.models.KeyedVectors.load_word2vec_format('pre_trained_embeddings/GoogleNews-vectors-negative300.bin', binary=True)
         word_model.wv
+
+
+load_data()
