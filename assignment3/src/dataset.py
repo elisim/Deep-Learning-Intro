@@ -102,7 +102,7 @@ def load_data():
 def dump_lyrics_to_file():
     with open(os.path.join(ROOT_PATH, DATA_PATH, 'unified_lyrics_dump.txt'), 'w') as fh:
         X, _ = load_data()
-        fh.write(' '.join(X.flatten()))
+        fh.write(' '.join(X.flatten()) + ' eos')
 
 
 def get_embedding_weights(embedding_type='glove'):
@@ -112,4 +112,3 @@ def get_embedding_weights(embedding_type='glove'):
         word_model = gensim.models.KeyedVectors.load_word2vec_format('pre_trained_embeddings/GoogleNews-vectors-negative300.bin', binary=True)
         word_model.wv
 
-load_data()
