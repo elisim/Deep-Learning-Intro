@@ -115,16 +115,17 @@ def load_tokenized_data():
     return X, y, tokenizer
 
 
-def extract_embedding_weights():
+def extract_embedding_weights(embedding_type='glove'):
     X, y, tokenizer = load_tokenized_data()
 
     # prepare embedding matrix
     word_index = tokenizer.word_index
     num_words = len(word_index) + 1
 
-    pretrained_embeddings = load_pretrained_embedding()
+    pretrained_embeddings = load_pretrained_embedding(embedding_type)
     embedding_matrix, not_found = prepare_embedding_matrix(num_words, EMBEDDING_DIM, word_index, pretrained_embeddings)
     return embedding_matrix
+
 
 def prepare_embedding_matrix(num_of_words, embedding_dim, word_index, pretrained_embeddings):
     embedding_matrix = np.zeros((num_of_words, embedding_dim))
@@ -152,8 +153,9 @@ def load_pretrained_embedding(embedding_type='glove'):
                     coefs = np.fromstring(coefs, 'f', sep=' ')
                     embeddings_index[word] = coefs
         else:
-            #TODO: implement word2vec vectors extraction
-            pass
+            word_model = gensim.models.KeyedVectors.load_word2vec_format(os.path.join(WORDS_VECTORS_DIR, 'GoogleNews-vectors-negative300.bin'), binary=True)
+            for word in word_model.vocab.keys():
+                embeddings_index[word] = word_model[word]
         with open(os.path.join(WORDS_VECTORS_DIR, f'{embedding_type}_embeddings.pickle'), 'wb') as f:
             pickle.dump(embeddings_index, f)
         return embeddings_index
@@ -168,4 +170,3 @@ def init_tokenizer(text):
     tokenizer = Tokenizer(filters='')
     tokenizer.fit_on_texts([text])
     return tokenizer
-
