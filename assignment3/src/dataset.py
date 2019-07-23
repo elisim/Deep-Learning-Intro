@@ -84,21 +84,25 @@ def prepare_train_data():
 
 def load_vocab():
     X, _ = load_data()
-    return list(set(X.flatten()))
+    return list(set(X.flatten())) + ['eos']
 
 
-def load_data():
+def load_data(with_melody=True):
     parsed_songs = prepare_train_data()
 
     X = np.hstack([song['X'] for song in parsed_songs])
     y = np.hstack([song['y'] for song in parsed_songs])
+
+    #if with_melody:
+    #    # TODO: change data here to be the vector that represent the melody
+    #    melody = np`
     return X, y
 
 
-def load_tokenized_data():
+def load_tokenized_data(with_melody=True):
     X,y = load_data()
 
-    all_songs_words = ' '.join(X.flatten()) + ' eos'
+    all_songs_words = ' '.join(load_vocab())
     tokenizer = init_tokenizer(all_songs_words)
 
     X = [lst[0] for lst in tokenizer.texts_to_sequences(X)]
