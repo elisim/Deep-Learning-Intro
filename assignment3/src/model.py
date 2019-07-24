@@ -5,7 +5,7 @@ import keras.backend as K
 import numpy as np
 
 EMBEDDING_DIM = 300
-INPUT_LENGTH = 1
+INPUT_LENGTH = 
 
 
 class Model:
@@ -58,24 +58,33 @@ class Model:
         tokenizer = self.tokenizer
         model = self.model
         in_text, result = first_word, first_word
+        encoded = get_encoded(in_text, tokenizer)
+        beam_sequences_scores = [[[encoded], 0]]
 
-        # generate a fixed number of words
-        for _ in range(n_words):
-            # encode the text as integer
-            encoded = tokenizer.texts_to_sequences([in_text])[0]
-            encoded = np.array(encoded)
-            # predict a word in the vocabulary
-            proba = model.predict_proba(encoded, verbose=0)
-            import ipdb
-            ipdb.set_trace()
-            out_word = ''
-            for word, index in tokenizer.word_index.items():
-                if index == yhat:
-                    out_word = word
-                    break
-            # append to input
-            in_text, result = out_word, result + ' ' + out_word
-        return result
+        while len(result) < n_words:
+            all_candidates = []
+            beam_sequences_scores = beam_step(beam_sequences_scores)
+            assert len(beam_sequences_scores) == B
+            for seq_score in beam_sequences_scores:
+                seq_scores = beam_step(seq_score)
+                all_candidates.append(seq_scores)
+            beam_sequences_scores = sorted(all_candidates, reverse=True, key=lambda seq, score: score)[:B]
+            assert len(beam_sequences_scores) == B
+            result, _= beam_sequences_scores[0]
+        
+        words = [get_word(token) for token in result]
+        return ' '.join(words)
+        
+        
+def get_encoded(text, tokenizer):
+    encoded = self.tokenizer.texts_to_sequences([text])[0]
+    encoded = np.array(encoded)
+    return encoded
+
+def get_word(index):
+    for word, idx in self.tokenizer.word_index.items():
+         if idx == index:
+            return word
 
 
 def _perplexity(y_true, y_pred):
