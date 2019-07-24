@@ -5,7 +5,7 @@ import keras.backend as K
 import numpy as np
 
 EMBEDDING_DIM = 300
-INPUT_LENGTH = 
+INPUT_LENGTH = 50
 
 
 class Model:
@@ -72,17 +72,17 @@ class Model:
             assert len(beam_sequences_scores) == B
             result, _= beam_sequences_scores[0]
         
-        words = [get_word(token) for token in result]
+        words = [get_word(token, self.tokenizer) for token in result]
         return ' '.join(words)
         
         
 def get_encoded(text, tokenizer):
-    encoded = self.tokenizer.texts_to_sequences([text])[0]
+    encoded = tokenizer.texts_to_sequences([text])[0]
     encoded = np.array(encoded)
     return encoded
 
-def get_word(index):
-    for word, idx in self.tokenizer.word_index.items():
+def get_word(index, tokenizer):
+    for word, idx in tokenizer.word_index.items():
          if idx == index:
             return word
 
