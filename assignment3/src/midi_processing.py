@@ -1,22 +1,35 @@
 import numpy as np
-import gensim
 import pretty_midi
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 import os
 from tqdm import tqdm
-from src.dataset import prepare_train_data
+from src.dataset import MIDI_PATH, DATA_PATH
 
-MIDI_PATH = "Data/midi_files"
 
-def check_if_melody(instrument, silence_threshold=0.7, mono_threshold=0.80):
-    piano_roll = instrument.get_piano_roll(fs=10)
+def check_if_melody(instrument, silence_threshold=0.7, mono_threshold=0.8, fs=10):
+    """
+    Check if the given instrument is Melody, Harmony or too silence
+
+    :param instrument: the object that contain the note information
+    :param silence_threshold: the threshold that above it the instrument considired to be too quiet.
+    :param mono_threshold: the threshold that above it the instrument considered to be a Melody
+    :param fs: the rate to sample from the midi
+    :return: True - the instrument is considered as melody, False - the instrument considered as harmony, -1 - the
+    instrument considered as too quiet.
+    """
+    # Extract all of the notes of the instrument
+    piano_roll = instrument.get_piano_roll(fs=fs)
+
+    # extract the timeframes the contain notes
     timeframes_with_notes_indexes = np.unique(np.where(piano_roll != 0))
     piano_roll_notes = piano_roll[:, timeframes_with_notes_indexes]
+
     n_timeframes = piano_roll.shape[1]
     n_notes = piano_roll_notes.shape[1]
     n_silence = n_timeframes - n_notes
     n_mono = np.count_nonzero(np.count_nonzero(piano_roll_notes > 0, axis=0) == 1)
 
+    # check if instrument is too quiet
     if silence_threshold <= float(n_silence)/n_timeframes:
         return -1
 
@@ -27,40 +40,63 @@ def check_if_melody(instrument, silence_threshold=0.7, mono_threshold=0.80):
 
 
 def number_to_note(number):
+    """
+    Extract note name from note number
+
+    :param number: index of note
+    :return: note name or "r" for rest
+    """
     if number == 128:
-        return 's'
+        return 'r'
     else:
         return pretty_midi.note_number_to_name(number)
 
 
-def extract_sample_from_melody_all(instrument, fs=5):
+def extract_notes_from_melody(instrument, window_size=50, fs=5, training_output=True):
+    """
+    Extract the notes strings from the melody instrument
+
+    :param instrument: the object that contain the note information
+    :param window_size: size of output "sentence"
+    :param fs: the rate to sample from the midi
+    :param training_output: if True - extract sentences in window_size size, if False - extract all of the notes in one
+                            list
+    :return: notes in string format
+    """
+
+    # Extract all of the notes of the instrument
     instrument_timeframes = instrument.get_piano_roll(fs=fs)
+
+    # find where is the first note
     melody_start = np.min(np.where((np.sum(instrument_timeframes, axis=0) > 0)))
     melody_piano_roll = instrument_timeframes[:, melody_start:]
+
+    # ignore the velocity of the melody
     melody_piano_roll = (melody_piano_roll > 0).astype(float)
+
+    # add an index for the rest notes, and assign 1 in those indexes
     rests = np.sum(melody_piano_roll, axis=0)
     rests = (rests != 1).astype(float)
     melody_piano_roll = np.insert(melody_piano_roll, 128, rests, axis=0)
 
-    return [number_to_note(np.where(note==1)[0][0]) for note in melody_piano_roll.T]
+    # if training_output=True, split the samples to windows otherwise extract one list with all of the notes
+    if training_output:
+        X = []
+        for i in range(0, melody_piano_roll.shape[1] - window_size):
+            window = melody_piano_roll[:, i:i + window_size]
+            X.append([number_to_note(np.where(note==1)[0][0]) for note in window.T])
+        return np.array(X)
+    else:
+        return [number_to_note(np.where(note == 1)[0][0]) for note in melody_piano_roll.T]
 
-def extract_sample_from_melody_windows(instrument, window_size=20, fs=5):
-    instrument_timeframes = instrument.get_piano_roll(fs=fs)
-    melody_start = np.min(np.where((np.sum(instrument_timeframes, axis=0) > 0)))
-    melody_piano_roll = instrument_timeframes[:, melody_start:]
-    melody_piano_roll = (melody_piano_roll > 0).astype(float)
-    rests = np.sum(melody_piano_roll, axis=0)
-    rests = (rests != 1).astype(float)
-    melody_piano_roll = np.insert(melody_piano_roll, 128, rests, axis=0)
-
-    X = []
-
-    for i in range(0, melody_piano_roll.shape[1] - window_size):
-        window = melody_piano_roll[:, i:i + window_size]
-        X.append([number_to_note(np.where(note==1)[0][0]) for note in window.T])
-    return np.array(X)
 
 def prepare_doc2vec(X):
+    """
+    Trainig a Doc2Vec model where doc == song
+
+    :param X: The samples
+    :return: Doc2Vec model
+    """
     documents = [TaggedDocument(doc, [i]) for i, doc in enumerate(X)]
     model = Doc2Vec(documents, vector_size=50, window=5, min_count=1, workers=4)
     return model
@@ -68,7 +104,7 @@ def prepare_doc2vec(X):
 
 def prepare_midi_embeddings(fs=5):
     X_total = []
-    for midi_file in tqdm(os.listdir(MIDI_PATH)[ : 20], total=20):
+    for midi_file in tqdm(os.listdir(os.DATA_PATH, MIDI_PATH)[:20], total=20):
         try:
             midi_obj = pretty_midi.PrettyMIDI(os.path.join(MIDI_PATH,midi_file))
         except Exception as e:
