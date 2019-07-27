@@ -6,7 +6,7 @@ from tqdm import tqdm
 from src.dataset import MIDI_PATH, DATA_PATH
 
 
-def check_if_melody(instrument, silence_threshold=0.7, mono_threshold=0.8, fs=10):
+def check_if_melody(instrument, silence_threshold=0.7, mono_threshold=0.8, fs=5):
     """
     Check if the given instrument is Melody, Harmony or too silence
 
@@ -21,7 +21,7 @@ def check_if_melody(instrument, silence_threshold=0.7, mono_threshold=0.8, fs=10
     piano_roll = instrument.get_piano_roll(fs=fs)
 
     # extract the timeframes the contain notes
-    timeframes_with_notes_indexes = np.unique(np.where(piano_roll != 0))
+    timeframes_with_notes_indexes = np.unique(np.where(piano_roll != 0)[1])
     piano_roll_notes = piano_roll[:, timeframes_with_notes_indexes]
 
     n_timeframes = piano_roll.shape[1]
@@ -71,12 +71,14 @@ def extract_notes_from_melody(instrument, window_size=50, fs=5, training_output=
     melody_start = np.min(np.where((np.sum(instrument_timeframes, axis=0) > 0)))
     melody_piano_roll = instrument_timeframes[:, melody_start:]
 
+    # TODO: filter all timeframes after the last note
+
     # ignore the velocity of the melody
     melody_piano_roll = (melody_piano_roll > 0).astype(float)
 
     # add an index for the rest notes, and assign 1 in those indexes
     rests = np.sum(melody_piano_roll, axis=0)
-    rests = (rests != 1).astype(float)
+    rests = (rests == 0).astype(float)
     melody_piano_roll = np.insert(melody_piano_roll, 128, rests, axis=0)
 
     # if training_output=True, split the samples to windows otherwise extract one list with all of the notes
@@ -88,6 +90,46 @@ def extract_notes_from_melody(instrument, window_size=50, fs=5, training_output=
         return np.array(X)
     else:
         return [number_to_note(np.where(note == 1)[0][0]) for note in melody_piano_roll.T]
+
+
+def extract_notes_from_harmony(instrument, window_size=200, fs=5, training_output=True):
+    """
+    Extract the notes strings from the melody instrument
+
+    :param instrument: the object that contain the note information
+    :param window_size: size of output "sentence"
+    :param fs: the rate to sample from the midi
+    :param training_output: if True - extract sentences in window_size size, if False - extract all of the notes in one
+                            list
+    :return: notes in string format
+    """
+
+    # Extract all of the notes of the instrument
+    instrument_timeframes = instrument.get_piano_roll(fs=fs)
+
+    # find where is the first note
+    harmony_start = np.min(np.where((np.sum(instrument_timeframes, axis=0) > 0)))
+    harmony_piano_roll = instrument_timeframes[:, harmony_start:]
+
+    # TODO: filter all timeframes after the last note
+
+    # ignore the velocity of the melody
+    harmony_piano_roll = (harmony_piano_roll > 0).astype(float)
+
+    # add an index for the rest notes, and assign 1 in those indexes
+    rests = np.sum(harmony_piano_roll, axis=0)
+    rests = (rests == 0).astype(float)
+    harmony_piano_roll = np.insert(harmony_piano_roll, 128, rests, axis=0)
+
+    # if training_output=True, split the samples to windows otherwise extract one list with all of the notes
+    if training_output:
+        X = []
+        for i in range(0, harmony_piano_roll.shape[1] - window_size):
+            window = harmony_piano_roll[:, i:i + window_size]
+            X.append(['-'.join([number_to_note(note_num) for note_num in np.where(note==1)[0]]) for note in window.T])
+        return np.array(X)
+    else:
+        return ['-'.join([number_to_note(note_num) for note_num in np.where(note==1)[0]]) for note in harmony_piano_roll.T]
 
 
 def prepare_doc2vec(X):
@@ -103,22 +145,63 @@ def prepare_doc2vec(X):
 
 
 def prepare_midi_embeddings(fs=5):
-    X_total = []
-    for midi_file in tqdm(os.listdir(os.DATA_PATH, MIDI_PATH)[:20], total=20):
+    # prepare 3 different samples - for drums, for harmony and for the melody
+
+    X_drums = []
+    X_melody = []
+    X_harmony = []
+
+    list_midi_files = os.listdir(os.path.join(DATA_PATH, MIDI_PATH))
+    for midi_file in tqdm(list_midi_files, total=len(list_midi_files)):
+        # load the midi file
         try:
-            midi_obj = pretty_midi.PrettyMIDI(os.path.join(MIDI_PATH,midi_file))
+            midi_obj = pretty_midi.PrettyMIDI(os.path.join(DATA_PATH, MIDI_PATH, midi_file))
         except Exception as e:
+            print('Error in loading {} file: {}'.format(midi_file, e))
             continue
+
+        # parse each one of the instruments
         for inst in midi_obj.instruments:
+
+            # if that drums we need to have special handling
             if inst.is_drum:
+                inst.is_drum = False
+                # check that notes give information
+                if np.count_nonzero(inst.get_piano_roll(fs=fs)) == 0:
+                    continue
+
+                X = extract_notes_from_harmony(inst, fs=fs)
+                X_drums.append(X)
+
+                inst.is_drum = True
                 continue
+
+            # if its not drums and there is no notes - dont use it
             if np.count_nonzero(inst.get_piano_roll(fs=fs) != 0) == 0:
                 continue
-            if check_if_melody(inst):
-                X = extract_sample_from_melody_windows(inst, fs=fs)
-                X_total.append(X)
-    X_total = np.vstack(X_total)
-    model = prepare_doc2vec(X_total)
-    return model
 
+            # now check if that instrument is melody or harmony
+            is_melody = check_if_melody(inst)
+            if is_melody == True:
+                X = extract_notes_from_melody(inst, fs=fs)
+                X_melody.append(X)
+            elif is_melody == False:
+                X = extract_notes_from_harmony(inst, fs=fs)
+                X_harmony.append(X)
+            else:
+                # Instrument is too quiet
+                continue
+    X_harmony = np.vstack(X_harmony)
+    X_melody = np.vstack(X_melody)
+    X_drums = np.vstack(X_drums)
+
+    harmony_model = prepare_doc2vec(X_harmony)
+    melody_model = prepare_doc2vec(X_melody)
+    drums_model = prepare_doc2vec(X_drums)
+
+    return harmony_model, melody_model, drums_model
+
+
+def get_song_vector():
+    pass
 
