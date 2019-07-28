@@ -3,6 +3,8 @@ from keras.initializers import Constant
 from keras import Sequential
 import keras.backend as K
 import numpy as np
+from keras.backend import epsilon
+import ipdb
 
 EMBEDDING_DIM = 300
 INPUT_LENGTH = 50
@@ -57,25 +59,42 @@ class Model:
     def predict(self, first_word, n_words, B=3):
         tokenizer = self.tokenizer
         model = self.model
-        in_text, result = first_word, first_word
+        in_text, result = first_word, [first_word]
         encoded = get_encoded(in_text, tokenizer)
-        beam_sequences_scores = [[[encoded], 0]]
+        beam_sequences_scores = [[encoded, 0]]
 
         while len(result) < n_words:
             all_candidates = []
-            beam_sequences_scores = beam_step(beam_sequences_scores)
-            assert len(beam_sequences_scores) == B
+            beam_sequences_scores = self.beam_step(beam_sequences_scores, B)
             for seq_score in beam_sequences_scores:
-                seq_scores = beam_step(seq_score)
+                seq_scores = self.beam_step([seq_score], B)
                 all_candidates.append(seq_scores)
-            beam_sequences_scores = sorted(all_candidates, reverse=True, key=lambda seq, score: score)[:B]
-            assert len(beam_sequences_scores) == B
+            flatten = lambda lst: [item for sublist in lst for item in sublist]
+            beam_sequences_scores = sorted(flatten(all_candidates), reverse=True, key=lambda tup: tup[1])[:B]
             result, _= beam_sequences_scores[0]
         
         words = [get_word(token, self.tokenizer) for token in result]
         return ' '.join(words)
-        
-        
+    
+    
+    def beam_step(self, beam_sequences_scores, B):            
+        all_candidates = []
+        for seq, score in beam_sequences_scores: # for each sequence
+            # predict top B words
+            seq_pad = pad_sequences([[sample] for sample in seq], maxlen=INPUT_LENGTH)
+            words_probs = self.model.predict_proba(seq_pad, verbose=0)[0]
+            words_probs_enu = list(enumerate(words_probs))
+            words_probs_sorted = sorted(words_probs_enu, key=lambda x: x[1], reverse=True) # sorting in descending order
+            top_b_words_probs = words_probs_sorted[:B] # top B words with max probability
+            # for each prob in top B words, create a candidate
+            for token, prob in top_b_words_probs: 
+                word_token = token
+                candidate = [np.append(seq, word_token), score + np.log(prob + epsilon())] # todo: word_token 
+                all_candidates.append(candidate)
+        # take candidates with max score
+        beam_sequences_scores = sorted(all_candidates, reverse=True, key=lambda tup: tup[1])[:B]
+        return beam_sequences_scores
+
 def get_encoded(text, tokenizer):
     encoded = tokenizer.texts_to_sequences([text])[0]
     encoded = np.array(encoded)
@@ -85,7 +104,6 @@ def get_word(index, tokenizer):
     for word, idx in tokenizer.word_index.items():
          if idx == index:
             return word
-
 
 def _perplexity(y_true, y_pred):
     cross_entropy = K.categorical_crossentropy(y_true, y_pred)

@@ -6,7 +6,7 @@ from tqdm import tqdm
 from src.dataset import MIDI_PATH, DATA_PATH
 
 
-def check_if_melody(instrument, silence_threshold=0.7, mono_threshold=0.8, fs=5):
+def check_if_melody(instrument, silence_threshold=0.7, mono_threshold=0.8, fs=10):
     """
     Check if the given instrument is Melody, Harmony or too silence
 
@@ -139,12 +139,13 @@ def prepare_doc2vec(X):
     :param X: The samples
     :return: Doc2Vec model
     """
+    #TODO: chane parameters of doc2vec
     documents = [TaggedDocument(doc, [i]) for i, doc in enumerate(X)]
     model = Doc2Vec(documents, vector_size=50, window=5, min_count=1, workers=4)
-    return model
+    return models
 
 
-def prepare_midi_embeddings(fs=5):
+def prepare_midi_embeddings_dataset(fs=10):
     # prepare 3 different samples - for drums, for harmony and for the melody
 
     X_drums = []
@@ -191,17 +192,10 @@ def prepare_midi_embeddings(fs=5):
             else:
                 # Instrument is too quiet
                 continue
-    X_harmony = np.vstack(X_harmony)
-    X_melody = np.vstack(X_melody)
-    X_drums = np.vstack(X_drums)
 
-    harmony_model = prepare_doc2vec(X_harmony)
-    melody_model = prepare_doc2vec(X_melody)
-    drums_model = prepare_doc2vec(X_drums)
+    return X_drums, X_melody, X_harmony
 
-    return harmony_model, melody_model, drums_model
 
 
 def get_song_vector():
     pass
-
