@@ -142,7 +142,7 @@ def prepare_doc2vec(X):
     #TODO: chane parameters of doc2vec
     documents = [TaggedDocument(doc, [i]) for i, doc in enumerate(X)]
     model = Doc2Vec(documents, vector_size=50, window=5, min_count=1, workers=4)
-    return models
+    return model
 
 
 def prepare_midi_embeddings_dataset(fs=10):

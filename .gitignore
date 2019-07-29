@@ -105,3 +105,4 @@ venv.bak/
 
 .idea/
 *.pdf
+assignment3/Data/*
