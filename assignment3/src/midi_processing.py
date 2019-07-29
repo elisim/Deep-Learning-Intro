@@ -6,7 +6,7 @@ from tqdm import tqdm
 from src.dataset import MIDI_PATH, DATA_PATH
 import joblib
 
-DOC2VEC_MODELS_PATHS = ''
+DOC2VEC_MODELS_PATHS = 'midi_preprocess/models'
 
 
 def check_if_melody(instrument, silence_threshold=0.7, mono_threshold=0.8, fs=10):
@@ -199,11 +199,11 @@ def prepare_midi_embeddings_dataset(fs=10):
     return X_drums, X_melody, X_harmony
 
 
-def get_song_vector(midi_path, fs=10):
+def get_song_vector(midi_path, models, fs=10):
     # load the doc2vec models
-    drum_model = joblib.load(os.path.join(DOC2VEC_MODELS_PATHS, 'drum_model.jblib'))
-    melody_model = joblib.load(os.path.join(DOC2VEC_MODELS_PATHS, 'melody_model.jblib'))
-    harmony_model = joblib.load(os.path.join(DOC2VEC_MODELS_PATHS, 'harmony_model.jblib'))
+    drum_model = models['drums']
+    melody_model = models['melody']
+    harmony_model = models['harmony']
 
     # extract the notes from the instruments in the midi_file
     midi_obj = pretty_midi.PrettyMIDI(midi_path)
@@ -220,7 +220,7 @@ def get_song_vector(midi_path, fs=10):
             if np.count_nonzero(inst.get_piano_roll(fs=fs)) == 0:
                 continue
 
-            drums_notes += extract_notes_from_harmony(inst, fs=fs)
+            drums_notes += extract_notes_from_harmony(inst, fs=fs, training_output=False)
 
             inst.is_drum = True
             continue
@@ -232,9 +232,9 @@ def get_song_vector(midi_path, fs=10):
         # now check if that instrument is melody or harmony
         is_melody = check_if_melody(inst)
         if is_melody == True:
-            melody_notes += extract_notes_from_melody(inst, fs=fs)
+            melody_notes += extract_notes_from_melody(inst, fs=fs, training_output=False)
         elif is_melody == False:
-            harmony_notes += extract_notes_from_harmony(inst, fs=fs)
+            harmony_notes += extract_notes_from_harmony(inst, fs=fs, training_output=False)
         else:
             # Instrument is too quiet
             continue
@@ -244,3 +244,13 @@ def get_song_vector(midi_path, fs=10):
     harmony_embedding = harmony_model.infer_vector(harmony_notes)
 
     return np.hstack([drums_embedding, melody_embedding, harmony_embedding])
+
+
+
+def extract_midi_piano_roll(midi_path, resize_to_size=None, fs=10)
+    midi_obj = pretty_midi.PrettyMIDI(midi_path)
+    results = midi_obj.get_piano_roll(fs=fs)
+    
+    if not resize_to_size is None:
+        
+    return results 
