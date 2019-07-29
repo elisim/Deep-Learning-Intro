@@ -60,6 +60,9 @@ def prepare_train_data():
         midi_file_path = '{}_-_{}.mid'.format(song['artist'].replace(' ', '_'), song['song_name'].replace(' ', '_'))
         if sum([1 for filename in midi_files_list if midi_file_path[:-4].replace('\\', '') in filename]) > 0:
             parsed_songs[i]['midi_path'] = os.path.join(ROOT_PATH,DATA_PATH, midi_file_path)
+    
+    # remove songs without midi
+    parsed_songs = [song for song in parsed_songs if 'midi_path' in song.keys()]
 
     # add special tokens
     for i, song in enumerate(parsed_songs):
@@ -98,6 +101,9 @@ def load_data(with_melody=True):
         return X, y, midi_path
         
     return X, y
+
+
+def load_songs_embeddings
 
 
 def load_tokenized_data(with_melody=True):
