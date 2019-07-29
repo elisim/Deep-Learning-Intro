@@ -106,3 +106,7 @@ venv.bak/
 .idea/
 *.pdf
 assignment3/Data/*
+backup_midi_embeddings/
+logs/
+midi_preprocess/
+word_vectors/
