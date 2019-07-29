@@ -4,6 +4,9 @@ from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 import os
 from tqdm import tqdm
 from src.dataset import MIDI_PATH, DATA_PATH
+import joblib
+
+DOC2VEC_MODELS_PATHS = ''
 
 
 def check_if_melody(instrument, silence_threshold=0.7, mono_threshold=0.8, fs=10):
@@ -142,7 +145,7 @@ def prepare_doc2vec(X):
     #TODO: chane parameters of doc2vec
     documents = [TaggedDocument(doc, [i]) for i, doc in enumerate(X)]
     model = Doc2Vec(documents, vector_size=50, window=5, min_count=1, workers=4)
-    return models
+    return model
 
 
 def prepare_midi_embeddings_dataset(fs=10):
@@ -196,6 +199,48 @@ def prepare_midi_embeddings_dataset(fs=10):
     return X_drums, X_melody, X_harmony
 
 
+def get_song_vector(midi_path, fs=10):
+    # load the doc2vec models
+    drum_model = joblib.load(os.path.join(DOC2VEC_MODELS_PATHS, 'drum_model.jblib'))
+    melody_model = joblib.load(os.path.join(DOC2VEC_MODELS_PATHS, 'melody_model.jblib'))
+    harmony_model = joblib.load(os.path.join(DOC2VEC_MODELS_PATHS, 'harmony_model.jblib'))
 
-def get_song_vector():
-    pass
+    # extract the notes from the instruments in the midi_file
+    midi_obj = pretty_midi.PrettyMIDI(midi_path)
+    melody_notes = []
+    harmony_notes = []
+    drums_notes = []
+
+    for inst in midi_obj.instruments:
+
+        # if that drums we need to have special handling
+        if inst.is_drum:
+            inst.is_drum = False
+            # check that notes give information
+            if np.count_nonzero(inst.get_piano_roll(fs=fs)) == 0:
+                continue
+
+            drums_notes += extract_notes_from_harmony(inst, fs=fs)
+
+            inst.is_drum = True
+            continue
+
+        # if its not drums and there is no notes - dont use it
+        if np.count_nonzero(inst.get_piano_roll(fs=fs) != 0) == 0:
+            continue
+
+        # now check if that instrument is melody or harmony
+        is_melody = check_if_melody(inst)
+        if is_melody == True:
+            melody_notes += extract_notes_from_melody(inst, fs=fs)
+        elif is_melody == False:
+            harmony_notes += extract_notes_from_harmony(inst, fs=fs)
+        else:
+            # Instrument is too quiet
+            continue
+
+    drums_embedding = drum_model.infer_vector(drums_notes)
+    melody_embedding = melody_model.infer_vector(melody_notes)
+    harmony_embedding = harmony_model.infer_vector(harmony_notes)
+
+    return np.hstack([drums_embedding, melody_embedding, harmony_embedding])
