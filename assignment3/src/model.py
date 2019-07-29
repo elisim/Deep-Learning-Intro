@@ -1,13 +1,17 @@
-from keras.layers import Embedding, CuDNNLSTM, Bidirectional, Dense, CuDNNGRU
+from keras.layers import Embedding, CuDNNLSTM, Bidirectional, Dense, CuDNNGRU, LSTM, GRU, Dropout
 from keras.initializers import Constant
 from keras import Sequential
 import keras.backend as K
 import numpy as np
 from keras.backend import epsilon
 import ipdb
+import random
+from keras_layer_normalization import LayerNormalization
+from keras import regularizers
+
 
 EMBEDDING_DIM = 300
-INPUT_LENGTH = 50
+INPUT_LENGTH = 1
 
 
 class Model:
@@ -15,6 +19,7 @@ class Model:
                  rnn_units=50,
                  bidirectional=True,
                  rnn_type='lstm',
+                 dropout=0.3,
                  show_summary=True):
         rnn_types = {
             'lstm': CuDNNLSTM,
@@ -29,20 +34,23 @@ class Model:
                                     EMBEDDING_DIM,
                                     embeddings_initializer=Constant(embedding_matrix),
                                     input_length=INPUT_LENGTH,
-                                    trainable=False)
+                                    trainable=True)
         model = Sequential()
         model.add(embedding_layer)
+        model.add(Dropout(dropout))
         if bidirectional:
             model.add(Bidirectional(rnn_type(rnn_units)))
         else:
             model.add(rnn_type(rnn_units))
-        model.add(Dense(num_words, activation='softmax'))
+        model.add(LayerNormalization())
+        model.add(Dense(num_words, kernel_regularizer=regularizers.l2(0.1), activation='softmax'))
         if show_summary:
             model.summary()
 
         self.model = model
         self.tokenizer = tokenizer
 
+        
     def train(self, X, y, epochs=5, batch_size=32, callbacks=[]):
         model = self.model
         # compile network
@@ -53,10 +61,37 @@ class Model:
                   batch_size=batch_size,
                   verbose=1, 
                   shuffle=True,
-                  validation_split=0.2,
+                  validation_split=0.1,
                   callbacks=callbacks)
 
-    def predict(self, first_word, n_words, B=3):
+        
+    def predict(self, first_word, n_words):
+        in_text, result = first_word, first_word
+        # generate a fixed number of words
+        for _ in range(n_words):
+            # encode the text as integer
+            encoded = self.tokenizer.texts_to_sequences([in_text])[0]
+            encoded = np.array(encoded)
+            
+            words_probs = self.model.predict_proba(encoded, verbose=0)[0]
+            
+            # get 2 arrays of probs and word_tokens
+            words_probs_enu = list(enumerate(words_probs))
+            words_probs_sorted = sorted(words_probs_enu, key=lambda x: x[1], reverse=True) # sorting in descending order
+            words_tokens, words_probs = list(zip(*words_probs_sorted))
+            # normalizre to sum 1 
+            words_probs = np.array(words_probs, dtype=np.float64)
+            words_probs /= words_probs.sum().astype(np.float64)
+            word_token = np.random.choice(words_tokens, p=words_probs)
+            
+            # map predicted word index to word
+            out_word = get_word(word_token, self.tokenizer)
+            # append to input
+            in_text, result = out_word, result + ' ' + out_word
+        return result      
+
+        
+    def predict_beam(self, first_word, n_words, B=3):
         tokenizer = self.tokenizer
         model = self.model
         in_text, result = first_word, [first_word]
@@ -95,6 +130,7 @@ class Model:
         beam_sequences_scores = sorted(all_candidates, reverse=True, key=lambda tup: tup[1])[:B]
         return beam_sequences_scores
 
+    
 def get_encoded(text, tokenizer):
     encoded = tokenizer.texts_to_sequences([text])[0]
     encoded = np.array(encoded)
