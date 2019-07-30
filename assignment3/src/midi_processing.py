@@ -3,6 +3,7 @@ import pretty_midi
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 from tqdm import tqdm
 from src.consts import *
+import cv2
 
 
 def check_if_melody(instrument, silence_threshold=0.7, mono_threshold=0.8, fs=10):
@@ -242,11 +243,10 @@ def get_song_vector(midi_path, models, fs=10):
     return np.hstack([drums_embedding, melody_embedding, harmony_embedding])
 
 
+def extract_midi_piano_roll(midi_path, resize_time=2500, fs=10):
+    midi_obj = pretty_midi.PrettyMIDI(midi_path)
+    results = midi_obj.get_piano_roll(fs=fs)
 
-# def extract_midi_piano_roll(midi_path, resize_to_size=None, fs=10):
-#     midi_obj = pretty_midi.PrettyMIDI(midi_path)
-#     results = midi_obj.get_piano_roll(fs=fs)
-#
-#     if not resize_to_size is None:
-#
-#     return results
+    cv2.resize(results, (results.shape[0], resize_time))
+
+    return results

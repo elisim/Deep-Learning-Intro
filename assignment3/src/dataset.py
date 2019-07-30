@@ -6,7 +6,7 @@ import itertools
 from keras.preprocessing.text import Tokenizer
 from keras.utils import to_categorical
 from tqdm import tqdm
-from src.midi_processing import get_song_vector
+from src.midi_processing import get_song_vector, extract_midi_piano_roll
 import joblib
 from src.consts import *
 
@@ -80,7 +80,7 @@ def load_vocab():
     return list(set(X.flatten())) + ['eos']
 
 
-def load_data(with_melody=True):
+def load_data(with_melody=True, melody_type='doc2vec'):
     parsed_songs = prepare_train_data()
 
     X_midi = [(song['midi_path'], len(song['X'])) for song in parsed_songs]
@@ -94,14 +94,21 @@ def load_data(with_melody=True):
 
         songs = []
         for midi_path, count in tqdm(X_midi, total=len(X_midi), desc='Loading the songs embedding'):
-            songs.append(np.array([get_song_vector(midi_path, models)]*count))
+            if melody_type == 'doc2vec':
+                songs.append(np.array([get_song_vector(midi_path, models)]*count))
+            else:
+                songs.append([extract_midi_piano_roll(midi_path)]*count)
         songs = np.vstack(songs)
         return X, y, songs
         
     return X, y
 
-def load_tokenized_data(with_melody=True):
-    X,y = load_data(with_melody=False)
+
+def load_tokenized_data(with_melody=False, melody_type='doc2vec'):
+    if with_melody:
+        X, y, songs = load_data(with_melody=with_melody, melody_type=melody_type)
+    else:
+        X, y = load_data(with_melody=with_melody, melody_type=melody_type)
 
     all_songs_words = ' '.join(load_vocab())
     tokenizer = init_tokenizer(all_songs_words)
@@ -110,7 +117,10 @@ def load_tokenized_data(with_melody=True):
     y = [lst[0] for lst in tokenizer.texts_to_sequences(y)]
     y = to_categorical(y, num_classes=len(tokenizer.word_index)+1)
 
-    return X, y, tokenizer
+    if with_melody:
+        return X, y, tokenizer, songs
+    else:
+        return X, y, tokenizer
 
 
 def init_tokenizer(text):
