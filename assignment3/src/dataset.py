@@ -93,9 +93,21 @@ def load_data(with_melody=True):
                   ['drums', 'melody', 'harmony']}
 
         songs = []
-        for midi_path, count in tqdm(X_midi, total=len(X_midi), desc='Loading the songs embedding'):
-            songs.append(np.array([get_song_vector(midi_path, models)]*count))
+        X = [] 
+        y = []
+        for i, (midi_path, count) in tqdm(enumerate(X_midi), total=len(X_midi), desc='Loading the songs embedding'):
+            try:
+                songs.append(np.array([get_song_vector(midi_path, models)]*count))
+                
+                # We don't wont to load songs with problematic midi
+                X.append(parsed_songs[i]['X'])
+                y.append(parsed_songs[i]['y'])
+            except Exception as e:
+                print(r"Couldn't load {}, issue with the midi file.".format(midi_path))
+                continue
         songs = np.vstack(songs)
+        X = np.hstack(X)
+        y = np.hstack(y)
         return X, y, songs
         
     return X, y
@@ -133,5 +145,3 @@ def syllable_count(word):
     if count == 0:
         count += 1
     return count
-
-X, y, songs = load_data()
