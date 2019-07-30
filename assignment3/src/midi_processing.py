@@ -1,12 +1,8 @@
 import numpy as np
 import pretty_midi
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
-import os
 from tqdm import tqdm
-from src.dataset import MIDI_PATH, DATA_PATH
-import joblib
-
-DOC2VEC_MODELS_PATHS = 'midi_preprocess/models'
+from src.consts import *
 
 
 def check_if_melody(instrument, silence_threshold=0.7, mono_threshold=0.8, fs=10):
@@ -247,10 +243,10 @@ def get_song_vector(midi_path, models, fs=10):
 
 
 
-def extract_midi_piano_roll(midi_path, resize_to_size=None, fs=10)
-    midi_obj = pretty_midi.PrettyMIDI(midi_path)
-    results = midi_obj.get_piano_roll(fs=fs)
-    
-    if not resize_to_size is None:
-        
-    return results 
+# def extract_midi_piano_roll(midi_path, resize_to_size=None, fs=10):
+#     midi_obj = pretty_midi.PrettyMIDI(midi_path)
+#     results = midi_obj.get_piano_roll(fs=fs)
+#
+#     if not resize_to_size is None:
+#
+#     return results

@@ -6,19 +6,9 @@ import itertools
 from keras.preprocessing.text import Tokenizer
 from keras.utils import to_categorical
 from tqdm import tqdm
-
-
-ROOT_PATH = "."
-DATA_PATH = "Data"
-MIDI_PATH = "midi_files"
-LYRICS_TRAIN = "lyrics_train_set.csv"
-LYRICS_TEST = "lyrics_test_set.csv"
-
-LYRICS_DIR = 'Data/'
-TEXT_DATA = os.path.join(LYRICS_DIR, 'unified_lyrics_dump.txt')
-
-MAX_SEQUENCE_LENGTH = 1  # During each step of the training phase, your architecture will receive as input one word of the lyrics.
-VALIDATION_SPLIT = 0.2
+from src.midi_processing import get_song_vector
+import joblib
+from src.consts import *
 
 
 def parse_input_line(line):
@@ -41,7 +31,7 @@ def parse_lyrices_line(line):
 
 def prepare_train_data():
     # extract list of midi files
-    midi_files_list = [filename.lower() for filename in os.listdir(os.path.join(ROOT_PATH,DATA_PATH, MIDI_PATH))]
+    midi_files_list = [filename.lower() for filename in os.listdir(os.path.join(ROOT_PATH, DATA_PATH, MIDI_PATH))]
 
     # read the lyrics from the train file
     with open(os.path.join(ROOT_PATH, DATA_PATH, LYRICS_TRAIN)) as fh:
@@ -59,7 +49,7 @@ def prepare_train_data():
     for i,song in enumerate(parsed_songs):
         midi_file_path = '{}_-_{}.mid'.format(song['artist'].replace(' ', '_'), song['song_name'].replace(' ', '_'))
         if sum([1 for filename in midi_files_list if midi_file_path[:-4].replace('\\', '') in filename]) > 0:
-            parsed_songs[i]['midi_path'] = os.path.join(ROOT_PATH,DATA_PATH, midi_file_path)
+            parsed_songs[i]['midi_path'] = os.path.join(ROOT_PATH, DATA_PATH, MIDI_PATH, midi_file_path)
     
     # remove songs without midi
     parsed_songs = [song for song in parsed_songs if 'midi_path' in song.keys()]
@@ -93,18 +83,22 @@ def load_vocab():
 def load_data(with_melody=True):
     parsed_songs = prepare_train_data()
 
+    X_midi = [(song['midi_path'], len(song['X'])) for song in parsed_songs]
     X = np.hstack([song['X'] for song in parsed_songs])
     y = np.hstack([song['y'] for song in parsed_songs])
 
     if with_melody:
-        midi_path = np.hstack([song['midi_path'] for song in parsed_songs])
-        return X, y, midi_path
+        print("Loading Doc2Vec models")
+        models = {name: joblib.load(os.path.join(DOC2VEC_MODELS_PATHS, f'{name}_model.jblib')) for name in
+                  ['drums', 'melody', 'harmony']}
+
+        songs = []
+        for midi_path, count in tqdm(X_midi, total=len(X_midi), desc='Loading the songs embedding'):
+            songs.append(np.array([get_song_vector(midi_path, models)]*count))
+        songs = np.vstack(songs)
+        return X, y, songs
         
     return X, y
-
-
-def load_songs_embeddings
-
 
 def load_tokenized_data(with_melody=True):
     X,y = load_data(with_melody=False)
@@ -139,3 +133,5 @@ def syllable_count(word):
     if count == 0:
         count += 1
     return count
+
+X, y, songs = load_data()
