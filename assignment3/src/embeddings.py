@@ -11,7 +11,7 @@ EMBEDDING_DIM = 300
 GLOVE_DIR = os.path.join(WORDS_VECTORS_DIR, 'glove.6B')
 
 
-def extract_embedding_weights(embedding_type='glove'):
+def extract_embedding_weights(embedding_type='glove', return_also_not_found=False):
     X, y, tokenizer = load_tokenized_data()
 
     # prepare embedding matrix
@@ -20,7 +20,10 @@ def extract_embedding_weights(embedding_type='glove'):
 
     pretrained_embeddings = load_pretrained_embedding(embedding_type)
     embedding_matrix, not_found = prepare_embedding_matrix(num_words, EMBEDDING_DIM, word_index, pretrained_embeddings)
-    return embedding_matrix
+    if return_also_not_found:
+        return embedding_matrix, not_found
+    else:
+        return embedding_matrix
 
 
 def prepare_embedding_matrix(num_of_words, embedding_dim, word_index, pretrained_embeddings):

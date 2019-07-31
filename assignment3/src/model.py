@@ -24,12 +24,13 @@ class LyricsOnlyModel:
                  rnn_type='lstm',
                  dropout=0.3,
                  show_summary=True,
+                 is_layer_norm=True,
                  train_embedding=True):
         rnn_types = {
             'lstm': KL.CuDNNLSTM,
             'gru': KL.CuDNNGRU
         }
-        rnn_type = rnn_types[rnn_type]
+        rnn_type = rnn_types[rnn_type.lower()]
 
         # load pre-trained word embeddings into an Embedding layer
         # note that we set trainable = False so as to keep the embeddings fixed
@@ -46,7 +47,8 @@ class LyricsOnlyModel:
             model.add(KL.Bidirectional(rnn_type(rnn_units)))
         else:
             model.add(rnn_type(rnn_units))
-        model.add(LayerNormalization())
+        if is_layer_norm:
+            model.add(LayerNormalization())
         model.add(KL.Dense(num_words, kernel_regularizer=regularizers.l2(0.1), activation='softmax'))
         if show_summary:
             model.summary()
@@ -137,12 +139,14 @@ class LyricsMelodyModel:
                  rnn_type='lstm',
                  dropout=0.3,
                  show_summary=True,
-                 train_embedding=True):
+                 train_embedding=True,
+                 is_layer_norm=True):
+        
         rnn_types = {
             'lstm': KL.CuDNNLSTM,
             'gru': KL.CuDNNGRU
         }
-        rnn_type = rnn_types[rnn_type]
+        rnn_type = rnn_types[rnn_type.lower()]
 
         # load pre-trained word embeddings into an Embedding layer
         # note that we set trainable = False so as to keep the embeddings fixed
@@ -164,7 +168,8 @@ class LyricsMelodyModel:
         combined = rnn_type(rnn_units)(combined)
         if bidirectional:
             combined = KL.Bidirectional(combined)
-        #         combined = LayerNormalization()(combined)
+        if is_layer_norm:
+            combined = LayerNormalization()(combined)
         combined = KL.Dense(num_words, kernel_regularizer=regularizers.l2(0.1), activation='softmax')(combined)
         model = Model(inputs=[lyrics_input, melody_input], outputs=[combined])
 
@@ -222,12 +227,13 @@ class LyricsMelodyCNNModel:
                  dropout=0.3,
                  show_summary=True,
                  train_embedding=True,
+                 is_layer_norm=True,
                  n_filters=20):
         rnn_types = {
             'lstm': KL.CuDNNLSTM,
             'gru': KL.CuDNNGRU
         }
-        rnn_type = rnn_types[rnn_type]
+        rnn_type = rnn_types[rnn_type.lower()]
 
         # load pre-trained word embeddings into an Embedding layer
         # note that we set trainable = False so as to keep the embeddings fixed
@@ -259,7 +265,8 @@ class LyricsMelodyCNNModel:
         combined = rnn_type(rnn_units)(combined)
         if bidirectional:
             combined = KL.Bidirectional(combined)
-        #         combined = LayerNormalization()(combined)
+        if is_layer_norm:
+            combined = LayerNormalization()(combined)
         combined = KL.Dense(num_words, kernel_regularizer=regularizers.l2(0.1), activation='softmax')(combined)
         model = Model(inputs=[lyrics_input, melody_input], outputs=[combined])
 
