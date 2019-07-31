@@ -176,7 +176,7 @@ def load_tokenized_test(tokenizer, with_melody=False, melody_type='doc2vec'):
 
 
 def init_tokenizer(text):
-    tokenizer = Tokenizer(filters='')
+    tokenizer = Tokenizer(filters='', oov_token='oov_token')
     tokenizer.fit_on_texts([text])
     return tokenizer
 
