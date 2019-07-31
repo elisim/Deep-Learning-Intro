@@ -162,7 +162,8 @@ class LyricsMelodyModel:
         lyrics = embedding_layer(lyrics_input)
         lyrics = KL.Flatten()(lyrics)
         lyrics = KL.Dropout(dropout)(lyrics)
-        combined = KL.Concatenate()([lyrics, melody_input])
+        melody = KL.Dropout(dropout)(melody_input)
+        combined = KL.Concatenate()([lyrics, melody])
         combined = KL.Reshape((1, EMBEDDING_DIM + MELODY_VEC_LENGTH))(combined)
         combined = rnn_type(rnn_units)(combined)
         if bidirectional:
