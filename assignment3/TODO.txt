@@ -1,7 +1,2 @@
 1. Todo: solve unknown word in pretrained_embeddings (words with ')
-
-4. replace several straight & with 1 dot
-
-# Critical!!
-2. create the nbs for save midi models & data 
 3. remove chorus and bridge
