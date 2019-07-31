@@ -1,3 +1,5 @@
+import warnings
+warnings.filterwarnings("ignore")
 import string
 import nltk
 import os
@@ -115,7 +117,7 @@ def load_data(with_melody=True, melody_type='doc2vec'):
     return X, y
 
 
-def load_tokenized_data(with_melody=False, melody_type='doc2vec'):
+def load_tokenized_data(with_melody=False, melody_type='doc2vec', max_samples=-1):
     if with_melody:
         X, y, songs = load_data(with_melody=with_melody, melody_type=melody_type)
     else:
@@ -128,7 +130,13 @@ def load_tokenized_data(with_melody=False, melody_type='doc2vec'):
     y = [lst[0] for lst in tokenizer.texts_to_sequences(y)]
     y = to_categorical(y, num_classes=len(tokenizer.word_index)+1)
 
+    if max_samples != -1:
+        X = X[:max_samples]
+        y = y[:max_samples]
+    
     if with_melody:
+        if max_samples != -1:
+            songs = songs[:max_samples, :]
         return X, y, tokenizer, songs
     else:
         return X, y, tokenizer

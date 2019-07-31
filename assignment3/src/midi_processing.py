@@ -1,3 +1,5 @@
+import warnings
+warnings.filterwarnings("ignore")
 import numpy as np
 import pretty_midi
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument

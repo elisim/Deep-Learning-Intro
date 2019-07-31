@@ -5,4 +5,3 @@
 # Critical!!
 2. create the nbs for save midi models & data 
 3. remove chorus and bridge
-5. Piano Roll to CNN

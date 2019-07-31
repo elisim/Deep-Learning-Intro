@@ -1,3 +1,5 @@
+import warnings
+warnings.filterwarnings("ignore")
 import keras.layers as KL
 from keras.initializers import Constant
 from keras import Sequential
@@ -12,6 +14,7 @@ from keras.preprocessing.sequence import pad_sequences
 EMBEDDING_DIM = 300
 INPUT_LENGTH = 1
 MELODY_VEC_LENGTH = 150
+MELODY_CNN_VEC_LENGTH = 128
 
 
 class LyricsOnlyModel:
@@ -210,6 +213,101 @@ class LyricsMelodyModel:
             in_text, result = out_word, result + ' ' + out_word
         return result
 
+    
+class LyricsMelodyCNNModel:
+    def __init__(self, tokenizer, embedding_matrix,
+                 rnn_units=50,
+                 bidirectional=True,
+                 rnn_type='lstm',
+                 dropout=0.3,
+                 show_summary=True,
+                 train_embedding=True,
+                 n_filters=20):
+        rnn_types = {
+            'lstm': KL.CuDNNLSTM,
+            'gru': KL.CuDNNGRU
+        }
+        rnn_type = rnn_types[rnn_type]
+
+        # load pre-trained word embeddings into an Embedding layer
+        # note that we set trainable = False so as to keep the embeddings fixed
+        num_words = len(tokenizer.word_index) + 1
+        embedding_layer = KL.Embedding(num_words,
+                                    EMBEDDING_DIM,
+                                    embeddings_initializer=Constant(embedding_matrix),
+                                    input_length=INPUT_LENGTH,
+                                    trainable=train_embedding)
+        lyrics_input = KL.Input(shape=(INPUT_LENGTH,))
+        melody_input = KL.Input(shape=(MELODY_CNN_VEC_LENGTH,MELODY_CNN_VEC_LENGTH, 1))
+
+        # lyrics 
+        lyrics = embedding_layer(lyrics_input)
+        lyrics = KL.Flatten()(lyrics)
+        lyrics = KL.Dropout(dropout)(lyrics)
+        
+        # melody CNN: [CONV + RELU => BATCH NORN] x 2 => MaxPool => Faltten  
+        melody = KL.Conv2D(n_filters, (3, 3), padding="same", activation='relu')(melody_input)
+        melody = KL.BatchNormalization()(melody)
+        melody = KL.Conv2D(n_filters, (3, 3), padding="same", activation='relu')(melody)
+        melody = KL.BatchNormalization()(melody)
+        melody = KL.MaxPooling2D()(melody)
+        melody = KL.Flatten()(melody)
+        
+        # concat
+        combined = KL.Concatenate()([lyrics, melody])
+        combined = KL.Reshape((1, 82220))(combined)
+        combined = rnn_type(rnn_units)(combined)
+        if bidirectional:
+            combined = KL.Bidirectional(combined)
+        #         combined = LayerNormalization()(combined)
+        combined = KL.Dense(num_words, kernel_regularizer=regularizers.l2(0.1), activation='softmax')(combined)
+        model = Model(inputs=[lyrics_input, melody_input], outputs=[combined])
+
+        if show_summary:
+            model.summary()
+
+        self.model = model
+        self.tokenizer = tokenizer
+
+    def train(self, X, y, epochs=5, batch_size=32, callbacks=[]):
+        model = self.model
+        # compile network
+        model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=[_perplexity])
+        # fit network
+        model.fit(X, y,
+                  epochs=epochs,
+                  batch_size=batch_size,
+                  verbose=1,
+                  shuffle=True,
+                  validation_split=0.1,
+                  callbacks=callbacks)
+
+    def predict(self, first_word, song, n_words):
+        in_text, result = first_word, first_word
+        # generate a fixed number of words
+        for _ in range(n_words):
+            # encode the text as integer
+            encoded = self.tokenizer.texts_to_sequences([in_text])[0]
+            encoded = np.array(encoded)
+
+            words_probs = self.model.predict([[encoded], [song]], verbose=0)[0]
+
+            # get 2 arrays of probs and word_tokens
+            words_probs_enu = list(enumerate(words_probs))
+            words_probs_sorted = sorted(words_probs_enu, key=lambda x: x[1],
+                                        reverse=True)  # sorting in descending order
+            words_tokens, words_probs = list(zip(*words_probs_sorted))
+            # normalizre to sum 1
+            words_probs = np.array(words_probs, dtype=np.float64)
+            words_probs /= words_probs.sum().astype(np.float64)
+            word_token = np.random.choice(words_tokens, p=words_probs)
+
+            # map predicted word index to word
+            out_word = get_word(word_token, self.tokenizer)
+            # append to input
+            in_text, result = out_word, result + ' ' + out_word
+        return result
+  
 
 def get_encoded(text, tokenizer):
     encoded = tokenizer.texts_to_sequences([text])[0]
