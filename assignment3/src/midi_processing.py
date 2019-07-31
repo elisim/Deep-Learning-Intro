@@ -243,10 +243,10 @@ def get_song_vector(midi_path, models, fs=10):
     return np.hstack([drums_embedding, melody_embedding, harmony_embedding])
 
 
-def extract_midi_piano_roll(midi_path, resize_time=2500, fs=10):
+def extract_midi_piano_roll(midi_path, resize_time=128, fs=10):
     midi_obj = pretty_midi.PrettyMIDI(midi_path)
     results = midi_obj.get_piano_roll(fs=fs)
 
-    cv2.resize(results, (results.shape[0], resize_time))
+    results = cv2.resize(results, (resize_time, results.shape[0]))
 
     return results
