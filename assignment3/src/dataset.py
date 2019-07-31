@@ -27,21 +27,22 @@ def parse_input_line(line):
 
 def parse_lyrices_line(line):
     splitted_line = line.split(',')
-    return {'artist': splitted_line[0], 'song_name': splitted_line[1], 'lyrics': ''.join(splitted_line[2:]),
+    return {'artist': splitted_line[0], 'song_name': splitted_line[1].strip(), 'lyrics': ''.join(splitted_line[2:]),
             'X': [], 'y': []}
 
 
-def prepare_train_data():
+def prepare_data(type='train'):
     # extract list of midi files
     midi_files_list = [filename.lower() for filename in os.listdir(os.path.join(ROOT_PATH, DATA_PATH, MIDI_PATH))]
 
     # read the lyrics from the train file
-    with open(os.path.join(ROOT_PATH, DATA_PATH, LYRICS_TRAIN)) as fh:
-        train_lines = fh.read().splitlines()
+    train_or_test = LYRICS_TRAIN if type == 'train' else LYRICS_TEST
+    with open(os.path.join(ROOT_PATH, DATA_PATH, train_or_test)) as fh:
+        data_lines = fh.read().splitlines()
 
     # parse the songs
     parsed_songs = []
-    for song_line in train_lines:
+    for song_line in data_lines:
         parsed_songs.append(parse_input_line(song_line))
 
     # in case of 2 songs in one line, flatten the songs
@@ -83,7 +84,7 @@ def load_vocab():
 
 
 def load_data(with_melody=True, melody_type='doc2vec'):
-    parsed_songs = prepare_train_data()
+    parsed_songs = prepare_data()
 
     X_midi = [(song['midi_path'], len(song['X'])) for song in parsed_songs]
     X = np.hstack([song['X'] for song in parsed_songs])
@@ -140,6 +141,38 @@ def load_tokenized_data(with_melody=False, melody_type='doc2vec', max_samples=-1
         return X, y, tokenizer, songs
     else:
         return X, y, tokenizer
+
+
+def load_test_data(with_melody=False, melody_type='doc2vec'):
+    parsed_songs = prepare_data(type='test')
+
+    if with_melody:
+        models = {name: joblib.load(os.path.join(DOC2VEC_MODELS_PATHS, f'{name}_model.jblib')) for name in
+                  ['drums', 'melody', 'harmony']}
+
+        for i, song_data in tqdm(enumerate(parsed_songs), total=len(parsed_songs), desc='Loading the songs embedding'):
+            try:
+                if melody_type == 'doc2vec':
+                    parsed_songs[i]['melody_embedding'] = np.array(get_song_vector(song_data['midi_path'], models))
+                else:
+                    parsed_songs[i]['melody_embedding'] = extract_midi_piano_roll(song_data['midi_path'])
+
+            except Exception as e:
+                print(r"Couldn't load {}, issue with the midi file.".format(song_data['midi_path']))
+                continue
+
+    return parsed_songs
+
+
+def load_tokenized_test(tokenizer, with_melody=False, melody_type='doc2vec'):
+    parsed_songs = load_test_data(with_melody=with_melody, melody_type=melody_type)
+
+    for i, song_data in enumerate(parsed_songs):
+        parsed_songs[i]['tokenized_X'] = [tokenizer.texts_to_sequences(song_data['X'])]
+        parsed_songs[i]['tokenized_y'] = [tokenizer.texts_to_sequences(song_data['y'])]
+        parsed_songs[i]['categorical_y'] = to_categorical(parsed_songs[i]['tokenized_y'], num_classes=len(tokenizer.word_index) + 1)
+
+    return parsed_songs
 
 
 def init_tokenizer(text):
