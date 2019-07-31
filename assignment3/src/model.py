@@ -159,7 +159,6 @@ class LyricsMelodyModel:
         lyrics_input = KL.Input(shape=(INPUT_LENGTH,))
         melody_input = KL.Input(shape=(MELODY_VEC_LENGTH,))
 
-        #         melody = Flatten()(melody_input)
         lyrics = embedding_layer(lyrics_input)
         lyrics = KL.Flatten()(lyrics)
         lyrics = KL.Dropout(dropout)(lyrics)
