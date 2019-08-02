@@ -258,6 +258,7 @@ class LyricsMelodyCNNModel:
         melody = KL.BatchNormalization()(melody)
         melody = KL.MaxPooling2D()(melody)
         melody = KL.Flatten()(melody)
+        melody = KL.Dropout(dropout)(melody)
         
         # concat
         combined = KL.Concatenate()([lyrics, melody])
