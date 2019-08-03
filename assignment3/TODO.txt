@@ -1,2 +1,0 @@
-1. Todo: solve unknown word in pretrained_embeddings (words with ')
-3. remove chorus and bridge
