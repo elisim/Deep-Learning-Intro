@@ -1,4 +1,5 @@
-# Deep-Learning-Intro
+# Deep-Learning-Intro [![HitCount](http://hits.dwyl.com/elisim/Deep-Learning-Intro.svg)](http://hits.dwyl.com/elisim/Deep-Learning-Intro)
+
 Repository for code assignments of Deep Learning course by Dr. Gilad Katz in Ben-Gurion University
 
 ### Drive link:
